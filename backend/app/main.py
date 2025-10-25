@@ -3,9 +3,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from typing import Optional
-import math
+import math, random
 
-from .recipes_loader import list_recipes, get_recipe, search_recipes, RECIPES_DIR
+from app.recipes_loader import list_recipes, get_recipe, search_recipes, RECIPES_DIR
 
 
 app = FastAPI(title="Recipes API")
@@ -27,52 +27,60 @@ if IMAGES_DIR.exists():
 
 
 def parse_sort_key(item, key: str):
-    # handle numeric fields and times; fallback to None
-    if key == "rating":
-        return item.get("rating") or 0
-    if key == "numberOfRatings":
-        return item.get("numberOfRatings") or 0
-    if key in ("preparationTime", "totalTime"):
-        # try to parse minutes: simple digits extraction
-        tv = item.get(key) or ""
-        digits = [int(s) for s in tv.replace("h", " godz.").split() if s.isdigit()]
-        if digits:
-            return digits[0]
+    try:
+        if key == "rating":
+            return item.get("rating") or 0
+        if key == "numberOfRatings":
+            return item.get("numberOfRatings") or 0
+        if key in ("preparationTime", "totalTime"):
+            return item.get(key) or 0
+        return item.get(key) or ""
+    except Exception:
         return 0
-    return item.get(key) or ""
 
 
 @app.get("/api/recipes")
 def api_list_recipes(
-    q: Optional[str] = Query(None, description="Search query for title or ingredients"),
-    sort: Optional[str] = Query(None, description="Sort field: rating, numberOfRatings, preparationTime, totalTime"),
+    q: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None),
     desc: bool = Query(False),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=200),
+    randomize: bool = Query(False),
+    rating_min: float = Query(0.0),
+    rating_max: float = Query(5.0),
+    num_ratings_min: int = Query(0),
+    num_ratings_max: int = Query(100000),
 ):
     if q:
         items = search_recipes(q)
+        total = len(items)
+        start = (page - 1) * per_page
+        end = start + per_page
+        page_items = items[start:end]
     else:
-        items = list_recipes()
+        result = list_recipes(
+            page=page,
+            per_page=per_page,
+            randomize=randomize,
+            rating_min=rating_min,
+            rating_max=rating_max,
+            num_ratings_min=num_ratings_min,
+            num_ratings_max=num_ratings_max,
+        )
+        items = result["items"]
+        total = result["total"]
 
-
-    # Pagination + sort
     if sort:
         items = sorted(items, key=lambda it: parse_sort_key(it, sort), reverse=desc)
-
-
-    total = len(items)
-    start = (page - 1) * per_page
-    end = start + per_page
-    page_items = items[start:end]
-
 
     return {
         "total": total,
         "page": page,
         "per_page": per_page,
-        "items": page_items,
+        "items": items,
     }
+
 
 
 @app.get("/api/recipes/{rid}")

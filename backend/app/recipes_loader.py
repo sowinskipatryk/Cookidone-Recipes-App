@@ -6,8 +6,9 @@ from pathlib import Path
 from typing import List, Dict
 
 # --- Paths ---
-RECIPES_DIR = Path(__file__).resolve().parents[2] / "recipes"
-DB_PATH = Path(__file__).resolve().parents[2] / "recipes.db"
+BASE_DIR = Path(__file__).resolve().parents[2]
+RECIPES_DIR = BASE_DIR / "recipes"
+DB_PATH = BASE_DIR / "recipes.db"
 
 
 # --- Database setup ---
@@ -224,21 +225,49 @@ def import_json_to_db():
     print(f"    Duplicated: {replaced_count}")
 
 
-# --- Public functions ---
-def list_recipes() -> List[Dict]:
-    """List up to 100 recipes sorted by rating."""
+def list_recipes(
+    page: int = 1,
+    per_page: int = 20,
+    randomize: bool = False,
+    rating_min: float = 0.0,
+    rating_max: float = 5.0,
+    num_ratings_min: int = 0,
+    num_ratings_max: int = 100000,
+) -> dict:
+    """Paginated and filtered list of recipes from DB."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    cur.execute("""
-        SELECT id, title, rating, numberOfRatings, preparationTime, totalTime
+
+    offset = (page - 1) * per_page
+    order_clause = "ORDER BY RANDOM()" if randomize else "ORDER BY rating DESC"
+
+    # Build WHERE clause dynamically
+    where_clause = """
+        WHERE rating BETWEEN ? AND ?
+          AND numberOfRatings BETWEEN ? AND ?
+    """
+
+    cur.execute(f"""
+        SELECT id, title, rating, numberOfRatings, preparationTime, totalTime, difficultyLevel
         FROM recipes
-        ORDER BY rating DESC
-        LIMIT 100
-    """)
-    data = [dict(row) for row in cur.fetchall()]
+        {where_clause}
+        {order_clause}
+        LIMIT ? OFFSET ?
+    """, (rating_min, rating_max, num_ratings_min, num_ratings_max, per_page, offset))
+    items = [dict(row) for row in cur.fetchall()]
+
+    cur.execute("""
+        SELECT COUNT(*) FROM recipes
+        WHERE rating BETWEEN ? AND ?
+          AND numberOfRatings BETWEEN ? AND ?
+    """, (rating_min, rating_max, num_ratings_min, num_ratings_max))
+    total = cur.fetchone()[0]
+
     conn.close()
-    return data
+    return {"items": items, "total": total}
+
+
 
 
 def get_recipe(rid: str) -> Dict:
