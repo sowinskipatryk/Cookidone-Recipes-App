@@ -94,8 +94,8 @@ def parse_portions(portions: str) -> int:
 
 
 def map_difficulty(level: str) -> int:
-    """Map Polish difficulty level to numeric (łatwy=1, średni=2, trudny=3)."""
-    mapping = {"łatwy": 1, "średni": 2, "trudny": 3}
+    """Map Polish difficulty level to numeric (łatwy=1, średni=2, zaawansowany=3)."""
+    mapping = {"łatwy": 1, "średni": 2, "zaawansowany": 3}
     return mapping.get(level.strip().lower(), 0) if level else 0
 
 
