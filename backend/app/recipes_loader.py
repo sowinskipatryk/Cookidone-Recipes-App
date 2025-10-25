@@ -123,15 +123,35 @@ def clean_nutrition(nutrition: dict) -> dict:
         "values": clean_values
     }
 
+def safe_float(value, default=0.0):
+    if value is None:
+        # print("⚠️ Found None when expecting float")
+        return default
+    try:
+        return float(value)
+    except Exception as e:
+        # print(f"⚠️ Failed float conversion for value {value}: {e}")
+        return default
+
+def safe_int(value, default=0):
+    if value is None:
+        # print("⚠️ Found None when expecting int")
+        return default
+    try:
+        return int(value)
+    except Exception as e:
+        # print(f"⚠️ Failed int conversion for value {value}: {e}")
+        return default
+
 
 def normalize_recipe(r: dict) -> dict:
     """Normalize and clean recipe fields."""
-    r["rating"] = float(r.get("rating", 0.0))
-    r["numberOfRatings"] = int(r.get("numberOfRatings", 0))
-    r["preparationTime"] = parse_time(r.get("preparationTime"))
-    r["totalTime"] = parse_time(r.get("totalTime"))
-    r["numberOfPortions"] = parse_portions(r.get("numberOfPortions"))
-    r["difficultyLevel"] = map_difficulty(r.get("difficultyLevel"))
+    r["rating"] = safe_float(r.get("rating"))
+    r["numberOfRatings"] = safe_int(r.get("numberOfRatings"))
+    r["preparationTime"] = safe_int(parse_time(r.get("preparationTime")))
+    r["totalTime"] = safe_int(parse_time(r.get("totalTime")))
+    r["numberOfPortions"] = safe_int(parse_portions(r.get("numberOfPortions")))
+    r["difficultyLevel"] = safe_int(map_difficulty(r.get("difficultyLevel")))
     r["ingredients"] = clean_ingredients(r.get("ingredients", []))
     r["nutrition"] = clean_nutrition(r.get("nutrition", {}))
     return r
@@ -139,7 +159,7 @@ def normalize_recipe(r: dict) -> dict:
 
 # --- Import logic ---
 def import_json_to_db():
-    """Read JSON files, normalize data, and insert into SQLite DB."""
+    """Read JSON files, normalize data, and insert into SQLite DB, tracking duplicates."""
     if DB_PATH.exists():
         print("Database already exists — skipping import.")
         return
@@ -149,7 +169,10 @@ def import_json_to_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    count = 0
+    inserted_count = 0
+    replaced_count = 0
+    total_count = 0
+
     for p in RECIPES_DIR.glob("*.json"):
         try:
             with open(p, "r", encoding="utf-8") as f:
@@ -160,13 +183,19 @@ def import_json_to_db():
                     continue
 
                 for r in data:
+                    total_count += 1
                     r = normalize_recipe(r)
                     rid = r.get("id") or p.stem
+
+                    # Check if recipe with this ID already exists
+                    c.execute("SELECT 1 FROM recipes WHERE id = ?", (rid,))
+                    exists = c.fetchone()
+
                     c.execute("""
-                    INSERT OR REPLACE INTO recipes
-                    (id, title, rating, numberOfRatings, preparationTime,
-                     totalTime, numberOfPortions, difficultyLevel, data)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, json(?))
+                        INSERT OR REPLACE INTO recipes
+                        (id, title, rating, numberOfRatings, preparationTime,
+                         totalTime, numberOfPortions, difficultyLevel, data)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, json(?))
                     """, (
                         rid,
                         r.get("title"),
@@ -178,13 +207,21 @@ def import_json_to_db():
                         r.get("difficultyLevel"),
                         json.dumps(r, ensure_ascii=False)
                     ))
-                    count += 1
+
+                    if exists:
+                        replaced_count += 1
+                    else:
+                        inserted_count += 1
+
         except Exception as e:
             print(f"⚠️ Failed to import {p}: {e}")
 
     conn.commit()
     conn.close()
-    print(f"✅ Imported {count} normalized recipes into SQLite database.")
+
+    print(f"Processed {total_count} recipes.")
+    print(f"    Inserted: {inserted_count}")
+    print(f"    Duplicated: {replaced_count}")
 
 
 # --- Public functions ---
