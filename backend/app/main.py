@@ -6,7 +6,7 @@ from typing import Optional
 import math
 
 from .recipes_loader import list_recipes, get_recipe, search_recipes, RECIPES_DIR
-from .schemas import Recipe, RecipeSummary
+
 
 app = FastAPI(title="Recipes API")
 
