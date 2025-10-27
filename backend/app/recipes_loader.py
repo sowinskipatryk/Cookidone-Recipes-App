@@ -174,7 +174,7 @@ def import_json_to_db():
     replaced_count = 0
     total_count = 0
 
-    for p in RECIPES_DIR.glob("*.json"):
+    for p in RECIPES_DIR.rglob("*.json"):
         try:
             with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f)
