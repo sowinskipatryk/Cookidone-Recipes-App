@@ -22,7 +22,7 @@ export default function RecipeList() {
   const [q, setQ] = useState('')
   const [items, setItems] = useState([])
   const [page, setPage] = useState(1)
-  const [perPage] = useState(10)
+  const [perPage] = useState(20)
   const [total, setTotal] = useState(0)
   const [sort, setSort] = useState('')
   const [desc, setDesc] = useState(false)
@@ -32,31 +32,8 @@ export default function RecipeList() {
   const [ratingRange, setRatingRange] = useState([0, 5])
   const [numRatingsRange, setNumRatingsRange] = useState([0, 5000])
   const [firstLoad, setFirstLoad] = useState(true)
-
-  // --- New: language & categories ---
   const [language, setLanguage] = useState('')
   const [categories, setCategories] = useState([])
-  const [availableLanguages, setAvailableLanguages] = useState([])
-  const [availableCategories, setAvailableCategories] = useState([])
-
-  // --- Fetch filters on mount ---
-  useEffect(() => {
-    async function fetchFilters() {
-      try {
-        const [langsRes, catsRes] = await Promise.all([
-          fetch(`${API}/api/languages`),
-          fetch(`${API}/api/categories`)
-        ])
-        const langs = await langsRes.json()
-        const cats = await catsRes.json()
-        setAvailableLanguages(langs)
-        setAvailableCategories(cats)
-      } catch (e) {
-        console.error('Failed to load filters', e)
-      }
-    }
-    fetchFilters()
-  }, [])
 
   useEffect(() => {
     fetchList(firstLoad)
@@ -64,10 +41,10 @@ export default function RecipeList() {
   }, [page, sort, desc])
 
   useEffect(() => {
-    if (firstLoad) return;
+    if (firstLoad) return
     const delay = setTimeout(() => fetchList(false), 500)
     return () => clearTimeout(delay)
-  }, [q, language, categories, ratingRange, numRatingsRange])
+  }, [q, ratingRange, numRatingsRange, language, categories])
 
   function getSortValue(it, field) {
     if (!field) return 0
@@ -76,19 +53,15 @@ export default function RecipeList() {
     return it[field]
   }
 
-  function applyClientSort(arr) {
-    if (!sort) return arr
-    const copy = [...arr]
-    copy.sort((a, b) => {
-      const va = getSortValue(a, sort)
-      const vb = getSortValue(b, sort)
-      if (typeof va === 'number' && typeof vb === 'number') return desc ? vb - va : va - vb
-      return desc ? String(vb).localeCompare(String(va)) : String(va).localeCompare(String(vb))
-    })
-    return copy
+  function changeSort(field) {
+    if (sort === field) setDesc(!desc)
+    else {
+      setSort(field)
+      setDesc(false)
+    }
   }
 
-  async function fetchList(randomize = false) {
+  async function fetchList(first = false) {
     setLoading(true)
     setError(null)
 
@@ -98,33 +71,25 @@ export default function RecipeList() {
     params.set('per_page', perPage)
     if (sort) params.set('sort', sort)
     if (desc) params.set('desc', 'true')
-    if (randomize) params.set('randomize', 'true')
+    if (first) params.set('first_load', 'true')
+
     params.set('rating_min', ratingRange[0])
     params.set('rating_max', ratingRange[1])
     params.set('num_ratings_min', numRatingsRange[0])
     params.set('num_ratings_max', numRatingsRange[1])
-
     if (language) params.set('language', language)
     if (categories.length > 0) categories.forEach(cat => params.append('categories', cat))
 
     try {
       const res = await fetch(`${API}/api/recipes?${params.toString()}`)
       const data = await res.json()
-      setItems(applyClientSort(data.items || []))
-      setTotal(data.total || 0)
+      setItems(data.items)
+      setTotal(data.total)
     } catch (e) {
       console.error(e)
       setError('Failed to load recipes.')
     } finally {
       setLoading(false)
-    }
-  }
-
-  function changeSort(field) {
-    if (sort === field) setDesc(!desc)
-    else {
-      setSort(field)
-      setDesc(false)
     }
   }
 
@@ -144,12 +109,11 @@ export default function RecipeList() {
     }
   }
 
-  // --- JSX ---
   return (
     <div className="recipe-list-container">
       <form className="search-form">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by title or ingredient" />
-        <button type="button" onClick={() => { setQ(''); fetchList(true) }}>Clear</button>
+        <button type="button" onClick={() => { setQ(''); fetchList(false) }}>Clear</button>
       </form>
 
       <div className="sort-buttons">
@@ -161,33 +125,6 @@ export default function RecipeList() {
       </div>
 
       <div className="filters">
-        <div className="filter">
-          <label>Language:</label>
-          <select value={language} onChange={e => setLanguage(e.target.value)}>
-            <option value="">All</option>
-            {availableLanguages.map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
-          </select>
-        </div>
-
-        <div className="filter">
-          <label>Categories:</label>
-          <div className="categories-list">
-            {availableCategories.map(cat => (
-              <label key={cat} className="category-item">
-                <input
-                  type="checkbox"
-                  checked={categories.includes(cat)}
-                  onChange={e => {
-                    if (e.target.checked) setCategories([...categories, cat])
-                    else setCategories(categories.filter(c => c !== cat))
-                  }}
-                />
-                {cat}
-              </label>
-            ))}
-          </div>
-        </div>
-
         <div className="filter">
           <label>Rating: {ratingRange[0]} - {ratingRange[1]}</label>
           <input type="range" min="0" max="5" step="0.1"
@@ -206,6 +143,16 @@ export default function RecipeList() {
           <input type="range" min="0" max="5000" step="1"
             value={numRatingsRange[1]}
             onChange={e => setNumRatingsRange([numRatingsRange[0], Number(e.target.value)])} />
+        </div>
+
+        <div className="filter">
+          <label>Language:</label>
+          <input value={language} onChange={e => setLanguage(e.target.value)} placeholder="e.g. en, pl" />
+        </div>
+
+        <div className="filter">
+          <label>Categories (comma separated):</label>
+          <input value={categories.join(',')} onChange={e => setCategories(e.target.value.split(',').map(s => s.trim()))} placeholder="e.g. dessert,soup" />
         </div>
       </div>
 
@@ -254,11 +201,13 @@ export default function RecipeList() {
         <div className="modal" onClick={() => setSelectedRecipe(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <button className="close-btn" onClick={() => setSelectedRecipe(null)}>Close</button>
+
             <img
               className="recipe-large-img"
               src={`${API}/images/recipes/large/${selectedRecipe.id}.jpeg`}
               alt={selectedRecipe.title}
             />
+
             <h2>{selectedRecipe.title}</h2>
             <p><strong>Rating:</strong> {selectedRecipe.rating}</p>
             <p><strong>NumRatings:</strong> {selectedRecipe.numberOfRatings}</p>

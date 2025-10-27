@@ -52,53 +52,42 @@ def api_list_recipes(
     desc: bool = Query(False),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=200),
-    randomize: bool = Query(False),
+    randomize: bool = Query(False),      # optional
+    first_load: bool = Query(False),     # new
     rating_min: float = Query(0.0),
     rating_max: float = Query(5.0),
     num_ratings_min: int = Query(0),
     num_ratings_max: int = Query(100000),
-    language: Optional[str] = Query(None, description="Filter by language code (e.g., 'pl', 'en')"),
-    categories: Optional[List[str]] = Query(None, description="Filter by one or more category names"),
+    language: Optional[str] = Query(None),
+    categories: Optional[list[str]] = Query(None),
 ):
-    """
-    Paginated list of recipes with optional filters:
-      - q: full-text search
-      - language: filter by language
-      - categories: one or more category names
-    """
+    """List recipes with optional search, filters, sorting, pagination, and first-load shuffle."""
+    result = list_recipes(
+        page=page,
+        per_page=per_page,
+        randomize=randomize or first_load,
+        rating_min=rating_min,
+        rating_max=rating_max,
+        num_ratings_min=num_ratings_min,
+        num_ratings_max=num_ratings_max,
+        language=language,
+        categories=categories,
+    )
 
-    # --- Search by query ---
-    if q:
-        items = search_recipes(q)
-        total = len(items)
-        start = (page - 1) * per_page
-        end = start + per_page
-        page_items = items[start:end]
-    else:
-        result = list_recipes(
-            page=page,
-            per_page=per_page,
-            randomize=randomize,
-            rating_min=rating_min,
-            rating_max=rating_max,
-            num_ratings_min=num_ratings_min,
-            num_ratings_max=num_ratings_max,
-            language=language,
-            categories=categories,
-        )
-        page_items = result["items"]
-        total = result["total"]
+    items = result["items"]
+    total = result["total"]
 
-    # --- Sorting ---
+    # Sorting
     if sort:
-        page_items = sorted(page_items, key=lambda it: parse_sort_key(it, sort), reverse=desc)
+        items = sorted(items, key=lambda it: parse_sort_key(it, sort), reverse=desc)
 
     return {
         "total": total,
         "page": page,
         "per_page": per_page,
-        "items": page_items,
+        "items": items,
     }
+
 
 
 # --- Single recipe ---
