@@ -13,12 +13,12 @@ DB_PATH = BASE_DIR / "recipes.db"
 
 # --- Database setup ---
 def init_db():
-    """Create SQLite DB and FTS5 tables if not exist."""
+    """Create SQLite DB and related tables if not exist."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("PRAGMA foreign_keys = ON;")
 
-    # Main table
+    # --- Main table ---
     c.execute("""
     CREATE TABLE IF NOT EXISTS recipes (
         id TEXT PRIMARY KEY,
@@ -29,11 +29,31 @@ def init_db():
         totalTime INTEGER,
         numberOfPortions INTEGER,
         difficultyLevel INTEGER,
+        language TEXT,
         data JSON
     );
     """)
 
-    # FTS5 virtual table for full-text search
+    # --- Categories ---
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE
+    );
+    """)
+
+    # --- Recipe ↔ Category relation ---
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS recipe_categories (
+        recipe_id TEXT NOT NULL,
+        category_id INTEGER NOT NULL,
+        FOREIGN KEY(recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+        FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE,
+        PRIMARY KEY (recipe_id, category_id)
+    );
+    """)
+
+    # --- Full-Text Search table ---
     c.execute("""
     CREATE VIRTUAL TABLE IF NOT EXISTS recipes_fts USING fts5(
         title,
@@ -43,7 +63,7 @@ def init_db():
     );
     """)
 
-    # Triggers to keep FTS index updated
+    # --- FTS triggers ---
     c.executescript("""
     CREATE TRIGGER IF NOT EXISTS recipes_ai AFTER INSERT ON recipes BEGIN
       INSERT INTO recipes_fts(rowid, title, ingredients)
@@ -65,6 +85,12 @@ def init_db():
        WHERE rowid = old.rowid;
     END;
     """)
+
+    # --- Indexes ---
+    c.execute("CREATE INDEX IF NOT EXISTS idx_recipes_language ON recipes(language);")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_recipe_categories_recipe ON recipe_categories(recipe_id);")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_recipe_categories_category ON recipe_categories(category_id);")
 
     conn.commit()
     conn.close()
@@ -124,24 +150,18 @@ def clean_nutrition(nutrition: dict) -> dict:
         "values": clean_values
     }
 
+
 def safe_float(value, default=0.0):
-    if value is None:
-        # print("⚠️ Found None when expecting float")
-        return default
     try:
-        return float(value)
-    except Exception as e:
-        # print(f"⚠️ Failed float conversion for value {value}: {e}")
+        return float(value) if value is not None else default
+    except Exception:
         return default
 
+
 def safe_int(value, default=0):
-    if value is None:
-        # print("⚠️ Found None when expecting int")
-        return default
     try:
-        return int(value)
-    except Exception as e:
-        # print(f"⚠️ Failed int conversion for value {value}: {e}")
+        return int(value) if value is not None else default
+    except Exception:
         return default
 
 
@@ -160,7 +180,7 @@ def normalize_recipe(r: dict) -> dict:
 
 # --- Import logic ---
 def import_json_to_db():
-    """Read JSON files, normalize data, and insert into SQLite DB, tracking duplicates."""
+    """Read JSON files, normalize data, and insert into SQLite DB."""
     if DB_PATH.exists():
         print("Database already exists — skipping import.")
         return
@@ -176,6 +196,11 @@ def import_json_to_db():
 
     for p in RECIPES_DIR.rglob("*.json"):
         try:
+            # Example: recipes/pl/desserts/soups/recipes.json
+            rel_parts = p.relative_to(RECIPES_DIR).parts
+            language = rel_parts[0] if len(rel_parts) > 0 else "unknown"
+            categories = rel_parts[1:-1]  # all dirs between language and filename
+
             with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
@@ -188,15 +213,14 @@ def import_json_to_db():
                     r = normalize_recipe(r)
                     rid = r.get("id") or p.stem
 
-                    # Check if recipe with this ID already exists
                     c.execute("SELECT 1 FROM recipes WHERE id = ?", (rid,))
                     exists = c.fetchone()
 
                     c.execute("""
                         INSERT OR REPLACE INTO recipes
                         (id, title, rating, numberOfRatings, preparationTime,
-                         totalTime, numberOfPortions, difficultyLevel, data)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, json(?))
+                         totalTime, numberOfPortions, difficultyLevel, language, data)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, json(?))
                     """, (
                         rid,
                         r.get("title"),
@@ -206,8 +230,17 @@ def import_json_to_db():
                         r.get("totalTime"),
                         r.get("numberOfPortions"),
                         r.get("difficultyLevel"),
+                        language,
                         json.dumps(r, ensure_ascii=False)
                     ))
+
+                    # Insert categories
+                    for cat in categories:
+                        c.execute("INSERT OR IGNORE INTO categories(name) VALUES (?)", (cat,))
+                        c.execute("""
+                            INSERT OR IGNORE INTO recipe_categories(recipe_id, category_id)
+                            SELECT ?, id FROM categories WHERE name = ?
+                        """, (rid, cat))
 
                     if exists:
                         replaced_count += 1
@@ -225,6 +258,7 @@ def import_json_to_db():
     print(f"    Duplicated: {replaced_count}")
 
 
+# --- Query helpers ---
 def list_recipes(
     page: int = 1,
     per_page: int = 20,
@@ -233,6 +267,8 @@ def list_recipes(
     rating_max: float = 5.0,
     num_ratings_min: int = 0,
     num_ratings_max: int = 100000,
+    language: str = None,
+    categories: List[str] = None,
 ) -> dict:
     """Paginated and filtered list of recipes from DB."""
     conn = sqlite3.connect(DB_PATH)
@@ -240,60 +276,112 @@ def list_recipes(
     cur = conn.cursor()
 
     offset = (page - 1) * per_page
-    order_clause = "ORDER BY RANDOM()" if randomize else "ORDER BY rating DESC"
+    order_clause = "ORDER BY RANDOM()" if randomize else "ORDER BY r.rating DESC"
 
-    # Build WHERE clause dynamically
-    where_clause = """
-        WHERE rating BETWEEN ? AND ?
-          AND numberOfRatings BETWEEN ? AND ?
-    """
+    where = [
+        "r.rating BETWEEN ? AND ?",
+        "r.numberOfRatings BETWEEN ? AND ?"
+    ]
+    params = [rating_min, rating_max, num_ratings_min, num_ratings_max]
+
+    if language:
+        where.append("r.language = ?")
+        params.append(language)
+
+    join_clause = ""
+    if categories:
+        join_clause = """
+            JOIN recipe_categories rc ON rc.recipe_id = r.id
+            JOIN categories c ON c.id = rc.category_id
+        """
+        where.append(f"c.name IN ({','.join(['?'] * len(categories))})")
+        params.extend(categories)
+
+    where_clause = "WHERE " + " AND ".join(where)
 
     cur.execute(f"""
-        SELECT id, title, rating, numberOfRatings, preparationTime, totalTime, difficultyLevel
-        FROM recipes
+        SELECT DISTINCT r.id, r.title, r.rating, r.numberOfRatings,
+                        r.preparationTime, r.totalTime, r.difficultyLevel,
+                        r.language
+        FROM recipes r
+        {join_clause}
         {where_clause}
         {order_clause}
         LIMIT ? OFFSET ?
-    """, (rating_min, rating_max, num_ratings_min, num_ratings_max, per_page, offset))
+    """, (*params, per_page, offset))
     items = [dict(row) for row in cur.fetchall()]
 
-    cur.execute("""
-        SELECT COUNT(*) FROM recipes
-        WHERE rating BETWEEN ? AND ?
-          AND numberOfRatings BETWEEN ? AND ?
-    """, (rating_min, rating_max, num_ratings_min, num_ratings_max))
+    cur.execute(f"""
+        SELECT COUNT(DISTINCT r.id)
+        FROM recipes r
+        {join_clause}
+        {where_clause}
+    """, params)
     total = cur.fetchone()[0]
 
     conn.close()
     return {"items": items, "total": total}
 
 
-
-
 def get_recipe(rid: str) -> Dict:
-    """Get one recipe by ID."""
+    """Get one recipe by ID, including its categories."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
+
     cur.execute("SELECT * FROM recipes WHERE id = ?", (rid,))
     row = cur.fetchone()
+    if not row:
+        conn.close()
+        return None
+
+    recipe = dict(row)
+
+    cur.execute("""
+        SELECT c.name
+        FROM categories c
+        JOIN recipe_categories rc ON rc.category_id = c.id
+        WHERE rc.recipe_id = ?
+    """, (rid,))
+    recipe["categories"] = [r["name"] for r in cur.fetchall()]
+
     conn.close()
-    return dict(row) if row else None
+    return recipe
 
 
-def search_recipes(q: str) -> List[Dict]:
+def search_recipes(q: str, language: str = None, categories: List[str] = None) -> List[Dict]:
     """Full-text search using FTS5 on title and ingredients."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    cur.execute("""
-        SELECT r.*
+
+    where = ["fts MATCH ?"]
+    params = [q]
+
+    join_clause = "JOIN recipes_fts fts ON r.rowid = fts.rowid"
+
+    if language:
+        where.append("r.language = ?")
+        params.append(language)
+    if categories:
+        join_clause += """
+            JOIN recipe_categories rc ON rc.recipe_id = r.id
+            JOIN categories c ON c.id = rc.category_id
+        """
+        where.append(f"c.name IN ({','.join(['?'] * len(categories))})")
+        params.extend(categories)
+
+    where_clause = "WHERE " + " AND ".join(where)
+
+    cur.execute(f"""
+        SELECT DISTINCT r.*
         FROM recipes r
-        JOIN recipes_fts fts ON r.rowid = fts.rowid
-        WHERE fts MATCH ?
+        {join_clause}
+        {where_clause}
         ORDER BY r.rating DESC
         LIMIT 100
-    """, (q,))
+    """, params)
+
     data = [dict(row) for row in cur.fetchall()]
     conn.close()
     return data

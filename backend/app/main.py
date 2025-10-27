@@ -2,15 +2,20 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
-from typing import Optional
-import math, random
+from typing import Optional, List
+import math
 
-from app.recipes_loader import list_recipes, get_recipe, search_recipes, RECIPES_DIR
-
+from app.recipes_loader import (
+    list_recipes,
+    get_recipe,
+    search_recipes,
+    RECIPES_DIR,
+)
+import sqlite3
 
 app = FastAPI(title="Recipes API")
 
-# Allow local dev from vite
+# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -19,13 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# serve images statically from /images
+# --- Static files (images) ---
 IMAGES_DIR = Path(__file__).resolve().parents[2] / "images"
 if IMAGES_DIR.exists():
     app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
 
 
+# --- Helper: sorting ---
 def parse_sort_key(item, key: str):
     try:
         if key == "rating":
@@ -39,6 +44,7 @@ def parse_sort_key(item, key: str):
         return 0
 
 
+# --- Main list endpoint ---
 @app.get("/api/recipes")
 def api_list_recipes(
     q: Optional[str] = Query(None),
@@ -51,7 +57,17 @@ def api_list_recipes(
     rating_max: float = Query(5.0),
     num_ratings_min: int = Query(0),
     num_ratings_max: int = Query(100000),
+    language: Optional[str] = Query(None, description="Filter by language code (e.g., 'pl', 'en')"),
+    categories: Optional[List[str]] = Query(None, description="Filter by one or more category names"),
 ):
+    """
+    Paginated list of recipes with optional filters:
+      - q: full-text search
+      - language: filter by language
+      - categories: one or more category names
+    """
+
+    # --- Search by query ---
     if q:
         items = search_recipes(q)
         total = len(items)
@@ -67,22 +83,25 @@ def api_list_recipes(
             rating_max=rating_max,
             num_ratings_min=num_ratings_min,
             num_ratings_max=num_ratings_max,
+            language=language,
+            categories=categories,
         )
-        items = result["items"]
+        page_items = result["items"]
         total = result["total"]
 
+    # --- Sorting ---
     if sort:
-        items = sorted(items, key=lambda it: parse_sort_key(it, sort), reverse=desc)
+        page_items = sorted(page_items, key=lambda it: parse_sort_key(it, sort), reverse=desc)
 
     return {
         "total": total,
         "page": page,
         "per_page": per_page,
-        "items": items,
+        "items": page_items,
     }
 
 
-
+# --- Single recipe ---
 @app.get("/api/recipes/{rid}")
 def api_get_recipe(rid: str):
     r = get_recipe(rid)
@@ -91,11 +110,39 @@ def api_get_recipe(rid: str):
     return r
 
 
-# Simple health
+# --- Languages endpoint ---
+@app.get("/api/languages")
+def api_list_languages():
+    """Return list of all available languages."""
+    from app.recipes_loader import DB_PATH
+
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT language FROM recipes ORDER BY language")
+    langs = [row[0] for row in cur.fetchall() if row[0]]
+    conn.close()
+    return langs
+
+
+# --- Categories endpoint ---
+@app.get("/api/categories")
+def api_list_categories():
+    """Return list of all distinct categories."""
+    from app.recipes_loader import DB_PATH
+
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT name FROM categories")
+    cats = [row[0] for row in cur.fetchall() if row[0]]
+    conn.close()
+    return cats
+
+
+# --- Health check ---
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
 
 
-# If you want to serve the frontend build here, mount it similarly
+# --- Optionally serve frontend build ---
 # app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="frontend")
