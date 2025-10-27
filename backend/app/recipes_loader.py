@@ -335,7 +335,10 @@ def get_recipe(rid: str) -> Dict:
         conn.close()
         return None
 
-    recipe = dict(row)
+    result = dict(row)
+    if result.get("data"):
+        result["data"] = json.loads(result["data"])
+
 
     cur.execute("""
         SELECT c.name
@@ -343,10 +346,10 @@ def get_recipe(rid: str) -> Dict:
         JOIN recipe_categories rc ON rc.category_id = c.id
         WHERE rc.recipe_id = ?
     """, (rid,))
-    recipe["categories"] = [r["name"] for r in cur.fetchall()]
+    result["categories"] = [r["name"] for r in cur.fetchall()]
 
     conn.close()
-    return recipe
+    return result
 
 
 def search_recipes(q: str, language: str = None, categories: List[str] = None) -> List[Dict]:

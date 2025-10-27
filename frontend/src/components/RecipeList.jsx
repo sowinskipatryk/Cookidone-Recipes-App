@@ -215,19 +215,29 @@ export default function RecipeList() {
             <p><strong>Total Time:</strong> {selectedRecipe.totalTime}</p>
             <p><strong>Portions:</strong> {selectedRecipe.numberOfPortions}</p>
 
-            {selectedRecipe.ingredients?.length > 0 && (
+            {selectedRecipe.data?.ingredients?.length > 0 && (
               <div>
                 <h3>Ingredients:</h3>
-                <ul>{selectedRecipe.ingredients.map((i, idx) => <li key={idx}>{i}</li>)}</ul>
+                <ul>{selectedRecipe.data.ingredients.map((i, idx) => <li key={idx}>{i}</li>)}</ul>
               </div>
             )}
 
-            {selectedRecipe.recipe?.length > 0 && (
+            {selectedRecipe.data?.recipe?.length > 0 && (
               <div>
                 <h3>Steps:</h3>
-                <ol>{selectedRecipe.recipe.map((s, idx) => <li key={idx}>{s}</li>)}</ol>
+                <ol>{selectedRecipe.data.recipe.map((s, idx) => <li key={idx}>{s}</li>)}</ol>
               </div>
             )}
+
+            {selectedRecipe.data?.nutrition && (
+              <div>
+                <h3>Nutrition (per serving):</h3>
+                <ul>
+                  {Object.entries(selectedRecipe.data.nutrition.values).map(([k,v]) => <li key={k}>{k}: {v}</li>)}
+                </ul>
+              </div>
+            )}
+
           </div>
         </div>
       )}
