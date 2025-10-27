@@ -113,3 +113,10 @@
 .filter input[type="range"] {
   width: 150px;
 }
+
+.recipe-large-img {
+  max-height: 480px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}

@@ -180,7 +180,7 @@ export default function RecipeList() {
               {items
                 .map(it => (
                   <tr key={it.id} onClick={() => openRecipe(it.id)} style={{ cursor: 'pointer' }}>
-                    <td><img src={`${API}/images/small/${it.id}.jpeg`} alt="" /></td>
+                    <td><img src={`${API}/images/recipes/small/${it.id}.jpeg`} alt="" /></td>
                     <td>{it.title}</td>
                     <td>{it.rating}</td>
                     <td>{it.numberOfRatings}</td>
@@ -208,6 +208,13 @@ export default function RecipeList() {
         <div className="modal" onClick={() => setSelectedRecipe(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <button className="close-btn" onClick={() => setSelectedRecipe(null)}>Close</button>
+
+            <img
+              className="recipe-large-img"
+              src={`${API}/images/recipes/large/${selectedRecipe.id}.jpeg`}
+              alt={selectedRecipe.title}
+            />
+
             <h2>{selectedRecipe.title}</h2>
             <p><strong>Rating:</strong> {selectedRecipe.rating}</p>
             <p><strong>NumRatings:</strong> {selectedRecipe.numberOfRatings}</p>
@@ -216,11 +223,17 @@ export default function RecipeList() {
             <p><strong>Portions:</strong> {selectedRecipe.numberOfPortions}</p>
 
             {selectedRecipe.ingredients?.length > 0 && (
-              <div><h3>Ingredients:</h3><ul>{selectedRecipe.ingredients.map((i, idx) => <li key={idx}>{i}</li>)}</ul></div>
+              <div>
+                <h3>Ingredients:</h3>
+                <ul>{selectedRecipe.ingredients.map((i, idx) => <li key={idx}>{i}</li>)}</ul>
+              </div>
             )}
 
             {selectedRecipe.recipe?.length > 0 && (
-              <div><h3>Steps:</h3><ol>{selectedRecipe.recipe.map((s, idx) => <li key={idx}>{s}</li>)}</ol></div>
+              <div>
+                <h3>Steps:</h3>
+                <ol>{selectedRecipe.recipe.map((s, idx) => <li key={idx}>{s}</li>)}</ol>
+              </div>
             )}
           </div>
         </div>
