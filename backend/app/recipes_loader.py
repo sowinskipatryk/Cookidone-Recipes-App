@@ -1,5 +1,5 @@
-import os
 import json
+import random
 import re
 import sqlite3
 from pathlib import Path
@@ -276,7 +276,7 @@ def list_recipes(
     cur = conn.cursor()
 
     offset = (page - 1) * per_page
-    order_clause = "ORDER BY RANDOM()" if randomize else "ORDER BY r.rating DESC"
+    order_clause = "ORDER BY r.rating DESC"  # default deterministic order
 
     where = [
         "r.rating BETWEEN ? AND ?",
@@ -307,17 +307,18 @@ def list_recipes(
         {join_clause}
         {where_clause}
         {order_clause}
-        LIMIT ? OFFSET ?
-    """, (*params, per_page, offset))
-    items = [dict(row) for row in cur.fetchall()]
-
-    cur.execute(f"""
-        SELECT COUNT(DISTINCT r.id)
-        FROM recipes r
-        {join_clause}
-        {where_clause}
     """, params)
-    total = cur.fetchone()[0]
+    all_items = [dict(row) for row in cur.fetchall()]
+    total = len(all_items)
+
+    # Randomize *after* filtering, if requested
+    if randomize:
+        random.shuffle(all_items)
+
+    # Apply pagination manually
+    start = (page - 1) * per_page
+    end = start + per_page
+    items = all_items[start:end]
 
     conn.close()
     return {"items": items, "total": total}

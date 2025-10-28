@@ -81,7 +81,8 @@ export default function RecipeList() {
     if (categories.length > 0) categories.forEach(cat => params.append('categories', cat))
 
     try {
-      const res = await fetch(`${API}/api/recipes?${params.toString()}`)
+      if (first || (!sort && !desc)) params.set('randomize', 'true')
+        const res = await fetch(`${API}/api/recipes?${params.toString()}`)
       const data = await res.json()
       setItems(data.items)
       setTotal(data.total)
