@@ -35,6 +35,8 @@ export default function RecipeList() {
   const [firstLoad, setFirstLoad] = useState(true)
   const [language, setLanguage] = useState('')
   const [categories, setCategories] = useState([])
+  const [allCategories, setAllCategories] = useState([])
+  const [catOpen, setCatOpen] = useState(false)
   const [languageFilter, setLanguageFilter] = useState({
     ENG: true,
     PL: true,
@@ -45,11 +47,34 @@ export default function RecipeList() {
     if (firstLoad) setFirstLoad(false)
   }, [page, sort, desc])
 
-useEffect(() => {
-  if (firstLoad) return
-  const delay = setTimeout(() => fetchList(false), 500)
-  return () => clearTimeout(delay)
-}, [q, ratingRange, numRatingsRange, language, categories, languageFilter])
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const res = await fetch(`${API}/api/categories`)
+        const data = await res.json()
+        setAllCategories(data)
+      } catch (e) {
+        console.error('Failed to load categories:', e)
+      }
+    }
+    loadCategories()
+  }, [])
+
+
+  useEffect(() => {
+    if (firstLoad) return
+    const delay = setTimeout(() => fetchList(false), 500)
+    return () => clearTimeout(delay)
+  }, [q, ratingRange, numRatingsRange, language, categories, languageFilter])
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (!e.target.closest('.dropdown')) setCatOpen(false)
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
+
 
   function getSortValue(it, field) {
     if (!field) return 0
@@ -188,9 +213,40 @@ useEffect(() => {
         </div>
 
         <div className="filter">
-          <label>Categories (comma separated):</label>
-          <input value={categories.join(',')} onChange={e => setCategories(e.target.value.split(',').map(s => s.trim()))} placeholder="e.g. dessert,soup" />
+          <label>Categories:</label>
+          <div className="dropdown">
+            <button
+              type="button"
+              className="dropdown-toggle"
+              onClick={() => setCatOpen(o => !o)}
+            >
+              {categories.length > 0
+                ? `${categories.length} selected`
+                : 'Select categories'}
+            </button>
+
+            {catOpen && (
+              <div className="dropdown-menu">
+                {allCategories.map(cat => (
+                  <label key={cat} className="dropdown-item">
+                    <input
+                      type="checkbox"
+                      checked={categories.includes(cat)}
+                      onChange={e => {
+                        if (e.target.checked)
+                          setCategories(prev => [...prev, cat])
+                        else
+                          setCategories(prev => prev.filter(c => c !== cat))
+                      }}
+                    />
+                    {cat}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
       </div>
 
       {loading ? <div>Loading...</div> : error ? <div className="error">{error}</div> : (
