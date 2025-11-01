@@ -36,8 +36,8 @@ export default function RecipeList() {
   const [language, setLanguage] = useState('')
   const [categories, setCategories] = useState([])
   const [languageFilter, setLanguageFilter] = useState({
-    eng: true,
-    pl: true,
+    ENG: true,
+    PL: true,
   })
 
   useEffect(() => {
@@ -45,11 +45,11 @@ export default function RecipeList() {
     if (firstLoad) setFirstLoad(false)
   }, [page, sort, desc])
 
-  useEffect(() => {
-    if (firstLoad) return
-    const delay = setTimeout(() => fetchList(false), 500)
-    return () => clearTimeout(delay)
-  }, [q, ratingRange, numRatingsRange, language, categories])
+useEffect(() => {
+  if (firstLoad) return
+  const delay = setTimeout(() => fetchList(false), 500)
+  return () => clearTimeout(delay)
+}, [q, ratingRange, numRatingsRange, language, categories, languageFilter])
 
   function getSortValue(it, field) {
     if (!field) return 0
@@ -172,15 +172,15 @@ export default function RecipeList() {
           <label>Language:</label>
           <div className="language-buttons">
             <button
-              className={languageFilter.eng ? "active" : ""}
-              onClick={() => toggleLanguage("eng")}
+              className={languageFilter.ENG ? "active" : ""}
+              onClick={() => toggleLanguage("ENG")}
             >
               English
             </button>
 
             <button
-              className={languageFilter.pl ? "active" : ""}
-              onClick={() => toggleLanguage("pl")}
+              className={languageFilter.PL ? "active" : ""}
+              onClick={() => toggleLanguage("PL")}
             >
               Polski
             </button>
