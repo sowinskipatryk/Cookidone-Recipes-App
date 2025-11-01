@@ -269,6 +269,7 @@ def list_recipes(
     num_ratings_max: int = 100000,
     language: str = None,
     categories: List[str] = None,
+    seed: int = None,
 ) -> dict:
     """Paginated and filtered list of recipes from DB."""
     conn = sqlite3.connect(DB_PATH)
@@ -313,7 +314,8 @@ def list_recipes(
 
     # Randomize *after* filtering, if requested
     if randomize:
-        random.shuffle(all_items)
+        rnd = random.Random(seed or 777)
+        rnd.shuffle(all_items)
 
     # Apply pagination manually
     start = (page - 1) * per_page

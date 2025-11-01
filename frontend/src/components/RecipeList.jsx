@@ -31,9 +31,14 @@ export default function RecipeList() {
   const [error, setError] = useState(null)
   const [ratingRange, setRatingRange] = useState([0, 5])
   const [numRatingsRange, setNumRatingsRange] = useState([0, 5000])
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9))
   const [firstLoad, setFirstLoad] = useState(true)
   const [language, setLanguage] = useState('')
   const [categories, setCategories] = useState([])
+  const [languageFilter, setLanguageFilter] = useState({
+    eng: true,
+    pl: true,
+  })
 
   useEffect(() => {
     fetchList(firstLoad)
@@ -61,6 +66,13 @@ export default function RecipeList() {
     }
   }
 
+  function toggleLanguage(lang) {
+    setLanguageFilter(prev => ({
+      ...prev,
+      [lang]: !prev[lang]
+    }))
+  }
+
   async function fetchList(first = false) {
     setLoading(true)
     setError(null)
@@ -77,7 +89,17 @@ export default function RecipeList() {
     params.set('rating_max', ratingRange[1])
     params.set('num_ratings_min', numRatingsRange[0])
     params.set('num_ratings_max', numRatingsRange[1])
-    if (language) params.set('language', language)
+    params.set('seed', seed)
+    const enabledLanguages = Object.entries(languageFilter)
+      .filter(([_, enabled]) => enabled)
+      .map(([lang]) => lang)
+
+    if (enabledLanguages.length === 1) {
+      params.set('language', enabledLanguages[0])
+    } else {
+      params.delete('language') // send nothing to include both
+    }
+
     if (categories.length > 0) categories.forEach(cat => params.append('categories', cat))
 
     try {
@@ -148,7 +170,21 @@ export default function RecipeList() {
 
         <div className="filter">
           <label>Language:</label>
-          <input value={language} onChange={e => setLanguage(e.target.value)} placeholder="e.g. en, pl" />
+          <div className="language-buttons">
+            <button
+              className={languageFilter.eng ? "active" : ""}
+              onClick={() => toggleLanguage("eng")}
+            >
+              English
+            </button>
+
+            <button
+              className={languageFilter.pl ? "active" : ""}
+              onClick={() => toggleLanguage("pl")}
+            >
+              Polski
+            </button>
+          </div>
         </div>
 
         <div className="filter">

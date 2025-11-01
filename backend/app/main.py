@@ -52,6 +52,7 @@ def api_list_recipes(
     desc: bool = Query(False),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=200),
+    seed: Optional[int] = Query(None),
     randomize: bool = Query(False),      # optional
     first_load: bool = Query(False),     # new
     rating_min: float = Query(0.0),
@@ -72,6 +73,7 @@ def api_list_recipes(
         num_ratings_max=num_ratings_max,
         language=language,
         categories=categories,
+        seed=seed,
     )
 
     items = result["items"]
