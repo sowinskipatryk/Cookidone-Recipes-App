@@ -1,3 +1,4 @@
+import { Range } from 'react-range'
 import React, { useEffect, useState } from 'react'
 import './RecipeList.css'
 
@@ -173,25 +174,111 @@ export default function RecipeList() {
       </div>
 
       <div className="filters">
-        <div className="filter">
-          <label>Rating: {ratingRange[0]} - {ratingRange[1]}</label>
-          <input type="range" min="0" max="5" step="0.1"
-            value={ratingRange[0]}
-            onChange={e => setRatingRange([Number(e.target.value), ratingRange[1]])} />
-          <input type="range" min="0" max="5" step="0.1"
-            value={ratingRange[1]}
-            onChange={e => setRatingRange([ratingRange[0], Number(e.target.value)])} />
-        </div>
+<div className="filter">
+  <label>Rating: </label>
+  <Range
+    step={0.1}
+    min={0}
+    max={5}
+    values={ratingRange}
+    onChange={setRatingRange}
+    renderTrack={({ props, children }) => (
+      <div
+        {...props}
+        style={{
+          ...props.style,
+          height: '6px',
+          width: '100%',
+          background: 'linear-gradient(to right, #ddd, #007bff)',
+          borderRadius: '3px',
+        }}
+      >
+        {children}
+      </div>
+    )}
+renderThumb={({ props, index }) => (
+  <div
+    {...props}
+    style={{
+      ...props.style, // keep the calculated top/left
+      height: '16px',
+      width: '16px',
+      borderRadius: '50%',
+      backgroundColor: '#007bff',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      // optional: add a border or box-shadow
+    }}
+  >
+    <div
+      style={{
+        position: 'absolute',
+        top: '-24px', // move the label above thumb
+        color: '#000',
+        fontSize: '12px',
+      }}
+    >
+      {ratingRange[index].toFixed(1)}
+    </div>
+  </div>
+)}
 
-        <div className="filter">
-          <label>NumRatings: {numRatingsRange[0]} - {numRatingsRange[1]}</label>
-          <input type="range" min="0" max="5000" step="1"
-            value={numRatingsRange[0]}
-            onChange={e => setNumRatingsRange([Number(e.target.value), numRatingsRange[1]])} />
-          <input type="range" min="0" max="5000" step="1"
-            value={numRatingsRange[1]}
-            onChange={e => setNumRatingsRange([numRatingsRange[0], Number(e.target.value)])} />
+  />
+</div>
+
+<div className="filter">
+  <label>
+    NumRatings:
+  </label>
+  <Range
+    step={1}
+    min={0}
+    max={5000}
+    values={numRatingsRange}
+    onChange={setNumRatingsRange}
+    renderTrack={({ props, children }) => (
+      <div
+        {...props}
+        style={{
+          ...props.style,
+          height: '6px',
+          width: '100%',
+          background: 'linear-gradient(to right, #ddd, #007bff)',
+          borderRadius: '3px',
+        }}
+      >
+        {children}
+      </div>
+    )}
+    renderThumb={({ props, index }) => (
+      <div
+        {...props}
+        style={{
+          ...props.style, // keep library-calculated top/left
+          height: '16px',
+          width: '16px',
+          borderRadius: '50%',
+          backgroundColor: '#007bff',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: '-24px', // move label above thumb
+            color: '#000',
+            fontSize: '12px',
+          }}
+        >
+          {numRatingsRange[index]}
         </div>
+      </div>
+    )}
+  />
+</div>
 
         <div className="filter">
           <label>Language:</label>
