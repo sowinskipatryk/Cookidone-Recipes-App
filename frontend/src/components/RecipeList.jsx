@@ -187,124 +187,92 @@ export default function RecipeList() {
 
   return (
     <div className="recipe-list-container">
-      <form className="search-form">
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by title or ingredient" />
-        <button type="button" onClick={() => { setQ(''); fetchList(false) }}>Clear</button>
+      <form className="search-form" onSubmit={e => e.preventDefault()}>
+        <div className="search-bar">
+          <input
+            type="text"
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="🔍 Search recipes..."
+          />
+          {q && (
+            <button
+              type="button"
+              className="clear-btn"
+              onClick={() => { setQ(''); fetchList(false) }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </form>
 
       <div className="sort-buttons">
-        <label>Sort:</label>
-        <button onClick={() => changeSort('rating')}>Rating</button>
-        <button onClick={() => changeSort('numberOfRatings')}>NumRatings</button>
-        <button onClick={() => changeSort('preparationTime')}>Prep Time</button>
-        <button onClick={() => changeSort('totalTime')}>Total Time</button>
+        <label>Sort by:</label>
+        {[
+          { key: 'rating', label: 'Rating' },
+          { key: 'numberOfRatings', label: 'NumRatings' },
+          { key: 'preparationTime', label: 'Prep Time' },
+          { key: 'totalTime', label: 'Total Time' },
+        ].map(opt => (
+          <button
+            key={opt.key}
+            className={
+              sort === opt.key ? `active ${desc ? 'desc' : 'asc'}` : ''
+            }
+            onClick={() => changeSort(opt.key)}
+          >
+            {opt.label}
+            {sort === opt.key && (
+              <span className="sort-arrow">{desc ? '↓' : '↑'}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       <div className="filters">
         <div className="filter">
-          <label>Rating: </label>
-          <Range
-            step={0.1}
-            min={1}
-            max={5}
-            values={ratingRange}
-            onChange={setRatingRange}
-            renderTrack={({ props, children }) => (
-              <div
-                {...props}
-                style={{
-                  ...props.style,
-                  height: '6px',
-                  width: '100%',
-                  background: 'linear-gradient(to right, #ddd, #007bff)',
-                  borderRadius: '3px',
-                }}
-              >
-                {children}
-              </div>
-            )}
-            renderThumb={({ props, index }) => (
-              <div
-                {...props}
-                style={{
-                  ...props.style, // keep the calculated top/left
-                  height: '16px',
-                  width: '16px',
-                  borderRadius: '50%',
-                  backgroundColor: '#007bff',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  // optional: add a border or box-shadow
-                }}
-              >
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '-24px', // move the label above thumb
-                    color: '#000',
-                    fontSize: '12px',
-                  }}
-                >
-                  {ratingRange[index].toFixed(1)}
-                </div>
-              </div>
-            )}
-
-          />
+          <label>Rating:</label>
+          <div className="range-wrapper">
+            <Range
+              step={0.1}
+              min={1}
+              max={5}
+              values={ratingRange}
+              onChange={setRatingRange}
+              renderTrack={({ props, children }) => (
+                <div {...props} className="range-track">{children}</div>
+              )}
+              renderThumb={({ props, index }) => (
+                <div {...props} className="range-thumb" />
+              )}
+            />
+            <div className="range-values">
+              <span>{ratingRange[0].toFixed(1)}</span>
+              <span>{ratingRange[1].toFixed(1)}</span>
+            </div>
+          </div>
         </div>
 
         <div className="filter">
-          <label>
-            NumRatings:
-          </label>
-          <Range
-            step={1}
-            min={0}
-            max={30000}
-            values={numRatingsRange}
-            onChange={setNumRatingsRange}
-            renderTrack={({ props, children }) => (
-              <div
-                {...props}
-                style={{
-                  ...props.style,
-                  height: '6px',
-                  width: '100%',
-                  background: 'linear-gradient(to right, #ddd, #007bff)',
-                  borderRadius: '3px',
-                }}
-              >
-                {children}
-              </div>
-            )}
-            renderThumb={({ props, index }) => (
-              <div
-                {...props}
-                style={{
-                  ...props.style, // keep library-calculated top/left
-                  height: '16px',
-                  width: '16px',
-                  borderRadius: '50%',
-                  backgroundColor: '#007bff',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '-24px', // move label above thumb
-                    color: '#000',
-                    fontSize: '12px',
-                  }}
-                >
-                  {numRatingsRange[index]}
-                </div>
-              </div>
-            )}
-          />
+          <label>NumRatings:</label>
+          <div className="range-wrapper">
+            <Range
+              step={1}
+              min={0}
+              max={30000}
+              values={numRatingsRange}
+              onChange={setNumRatingsRange}
+              renderTrack={({ props, children }) => (
+                <div {...props} className="range-track">{children}</div>
+              )}
+              renderThumb={({ props }) => <div {...props} className="range-thumb" />}
+            />
+            <div className="range-values">
+              <span>{numRatingsRange[0]}</span>
+              <span>{numRatingsRange[1]}</span>
+            </div>
+          </div>
         </div>
 
         <div className="filter">

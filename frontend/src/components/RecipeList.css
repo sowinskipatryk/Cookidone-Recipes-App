@@ -107,7 +107,7 @@
 
 .filter label {
   font-weight: bold;
-  margin-bottom: 4px;
+  margin-bottom: 12px;
 }
 
 .filter input[type="range"] {
@@ -303,4 +303,133 @@
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+/* --- Modern centered search bar --- */
+.search-form {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.search-bar {
+  position: relative;
+  width: 60%;
+  max-width: 500px;
+}
+
+.search-bar input {
+  width: 100%;
+  padding: 10px 36px 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 25px;
+  font-size: 16px;
+  outline: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.search-bar input:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 4px rgba(0,123,255,0.4);
+}
+
+.search-bar .clear-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #888;
+}
+
+.search-bar .clear-btn:hover {
+  color: #333;
+}
+
+/* --- Sort buttons with indicators --- */
+.sort-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.sort-buttons label {
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.sort-buttons button {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: #f8f8f8;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.sort-buttons button:hover {
+  background: #e9e9e9;
+}
+
+.sort-buttons button.active {
+  border-color: #007bff;
+  background: #eaf3ff;
+  color: #007bff;
+  font-weight: bold;
+}
+
+.sort-buttons button.active.asc .sort-arrow {
+  color: #007bff;
+}
+
+.sort-buttons button.active.desc .sort-arrow {
+  color: #007bff;
+  transform: rotate(180deg);
+}
+
+/* --- Range sliders --- */
+.range-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.range-track {
+  height: 6px;
+  width: 150px;
+  background: linear-gradient(to right, #ddd, #007bff);
+  border-radius: 3px;
+}
+
+.range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background-color: #007bff;
+  cursor: grab;
+}
+
+.range-values {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #555;
+  width: 150px;
+  margin-top: 2px;
+}
+
+/* Align filters nicely */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 16px;
 }

@@ -1,6 +1,6 @@
 import React from 'react'
 import RecipeList from './components/RecipeList'
-
+import './App.css'
 
 export default function App(){
     return (
