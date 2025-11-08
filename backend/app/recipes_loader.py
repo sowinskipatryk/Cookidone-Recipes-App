@@ -262,7 +262,7 @@ def import_json_to_db():
 def list_recipes(
     q: str = None,
     page: int = 1,
-    per_page: int = 20,
+    per_page: int = 30,
     sort: str = "rating",
     desc: bool = True,
     rating_min: float = 0.0,
@@ -279,12 +279,11 @@ def list_recipes(
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    # --- Build base query ---
     params = []
     joins = []
     where = ["1=1"]
 
-    # --- Filters ---
+    # Filters
     where.append("r.rating BETWEEN ? AND ?")
     params.extend([rating_min, rating_max])
 
@@ -303,16 +302,18 @@ def list_recipes(
         where.append(f"c.name IN ({','.join(['?'] * len(categories))})")
         params.extend(categories)
 
-    # --- Full-text search ---
+    # Full-text search (using subquery, no alias)
     if q:
-        joins.append("JOIN recipes_fts fts ON r.rowid = fts.rowid")
-        where.append("fts MATCH ?")
-        # partial search: add * if not present
         if not q.endswith('*'):
             q = q + '*'
+        where.append("""
+            r.rowid IN (
+                SELECT rowid FROM recipes_fts WHERE recipes_fts MATCH ?
+            )
+        """)
         params.append(q)
 
-    # --- Sorting ---
+    # Sorting
     valid_sort_keys = {
         "rating": "r.rating",
         "numberOfRatings": "r.numberOfRatings",
@@ -324,36 +325,37 @@ def list_recipes(
     order_by = valid_sort_keys.get(sort, "r.rating")
     order_clause = f"ORDER BY {order_by} {'DESC' if desc else 'ASC'}"
 
-    # --- Randomization ---
     if randomize:
         if seed is not None:
             random.seed(seed)
         order_clause = "ORDER BY RANDOM()"
 
-    # --- Pagination ---
     offset = (page - 1) * per_page
+    joins_sql = "\n".join(joins)
+    where_sql = " AND ".join(where)
 
-    # --- Query ---
-    base_query = f"""
+    # Count
+    count_sql = f"""
+        SELECT COUNT(DISTINCT r.id)
         FROM recipes r
-        {' '.join(joins)}
-        WHERE {' AND '.join(where)}
+        {joins_sql}
+        WHERE {where_sql}
     """
-
-    # --- Total count ---
-    cur.execute(f"SELECT COUNT(DISTINCT r.id) {base_query}", params)
+    cur.execute(count_sql, params)
     total = cur.fetchone()[0]
 
-    # --- Fetch paginated results ---
-    cur.execute(f"""
+    # Data
+    query_sql = f"""
         SELECT DISTINCT r.id, r.title, r.rating, r.numberOfRatings,
                         r.preparationTime, r.totalTime, r.difficultyLevel,
                         r.language
-        {base_query}
+        FROM recipes r
+        {joins_sql}
+        WHERE {where_sql}
         {order_clause}
         LIMIT ? OFFSET ?
-    """, params + [per_page, offset])
-
+    """
+    cur.execute(query_sql, params + [per_page, offset])
     items = [dict(row) for row in cur.fetchall()]
 
     conn.close()
