@@ -389,7 +389,25 @@ export default function RecipeList() {
             {selectedRecipe.data?.ingredients?.length > 0 && (
               <div>
                 <h3>Ingredients:</h3>
-                <ul>{selectedRecipe.data.ingredients.map((i, idx) => <li key={idx}>{i}</li>)}</ul>
+                <ul className="ingredients-list">
+                  {selectedRecipe.data.ingredients.map((name, idx) => {
+                    const id = selectedRecipe.data.ingredientIds?.[idx];
+                    const imgUrl = id ? `${API}/images/ingredients/${id}.png` : null;
+
+                    return (
+                      <li key={idx} className="ingredient-item">
+                        {imgUrl && (
+                          <img
+                            src={imgUrl}
+                            alt={name}
+                            onError={(e) => (e.target.style.display = 'none')}
+                          />
+                        )}
+                        <span>{name}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             )}
 
