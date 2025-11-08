@@ -62,6 +62,19 @@ def init_db():
     );
     """)
 
+    # --- Recipe ↔ Ingredient relation ---
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS recipe_ingredients (
+        recipe_id TEXT NOT NULL,
+        ingredient_id TEXT NOT NULL,
+        FOREIGN KEY(recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+        FOREIGN KEY(ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE,
+        PRIMARY KEY (recipe_id, ingredient_id)
+    );
+    """)
+    c.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_ingredient ON recipe_ingredients(ingredient_id);")
+
     # --- Full-Text Search table ---
     c.execute("""
     CREATE VIRTUAL TABLE IF NOT EXISTS recipes_fts USING fts5(
@@ -197,6 +210,7 @@ def import_recipes_to_db():
 
     print("Building SQLite database from JSON files...")
     init_db()
+    import_ingredients_to_db()
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
@@ -251,6 +265,17 @@ def import_recipes_to_db():
                             INSERT OR IGNORE INTO recipe_categories(recipe_id, category_id)
                             SELECT ?, id FROM categories WHERE name = ?
                         """, (rid, cat))
+
+                    ingredient_ids = r.get("ingredientIds", [])
+                    for iid in ingredient_ids:
+                        c.execute("SELECT id FROM ingredients WHERE id = ?", (iid,))
+                        row = c.fetchone()
+                        if row:
+                            iid = row[0]
+                            c.execute(
+                                "INSERT OR IGNORE INTO recipe_ingredients(recipe_id, ingredient_id) VALUES (?, ?)",
+                                (rid, iid)
+                            )
 
                     if exists:
                         replaced_count += 1
@@ -343,15 +368,38 @@ def list_recipes(
 
     # Include ingredients
     if include_ingredients:
-        for ing in include_ingredients:
-            where.append("r.rowid IN (SELECT rowid FROM recipes_fts WHERE recipes_fts MATCH ?)")
-            params.append(ing)
+        joins.append("""
+            JOIN recipe_ingredients ri_inc ON ri_inc.recipe_id = r.id
+            JOIN ingredients i_inc ON i_inc.id = ri_inc.ingredient_id
+        """)
+        # Must include all ingredients: use COUNT in a subquery
+        where.append(f"""
+            r.id IN (
+                SELECT ri.recipe_id
+                FROM recipe_ingredients ri
+                JOIN ingredients i ON i.id = ri.ingredient_id
+                WHERE i.name IN ({','.join(['?'] * len(include_ingredients))})
+                GROUP BY ri.recipe_id
+                HAVING COUNT(DISTINCT i.name) = ?
+            )
+        """)
+        params.extend(include_ingredients + [len(include_ingredients)])
 
     # Exclude ingredients
     if exclude_ingredients:
-        for ing in exclude_ingredients:
-            where.append("r.rowid NOT IN (SELECT rowid FROM recipes_fts WHERE recipes_fts MATCH ?)")
-            params.append(ing)
+        joins.append("""
+            LEFT JOIN recipe_ingredients ri_exc ON ri_exc.recipe_id = r.id
+            LEFT JOIN ingredients i_exc ON i_exc.id = ri_exc.ingredient_id
+        """)
+        where.append(f"""
+            r.id NOT IN (
+                SELECT ri.recipe_id
+                FROM recipe_ingredients ri
+                JOIN ingredients i ON i.id = ri.ingredient_id
+                WHERE i.name IN ({','.join(['?'] * len(exclude_ingredients))})
+            )
+        """)
+        params.extend(exclude_ingredients)
 
     if language:
         where.append("r.language = ?")
@@ -511,7 +559,6 @@ def search_recipes(
 # --- Run import automatically if DB doesn't exist ---
 if not DB_PATH.exists():
     import_recipes_to_db()
-    import_ingredients_to_db()
 else:
     init_db()
     import_ingredients_to_db()
