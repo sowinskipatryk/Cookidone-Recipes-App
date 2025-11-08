@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional, List
 import math
 
-from app.recipes_loader import (
+from app.data_loader import (
     list_recipes,
     get_recipe,
     search_recipes,
@@ -59,7 +59,9 @@ def api_list_recipes(
     num_ratings_min: int = Query(0),
     num_ratings_max: int = Query(100000),
     language: Optional[str] = Query(None),
-    categories: Optional[list[str]] = Query(None),
+    categories: Optional[List[str]] = Query(None),
+    includeIngredients: Optional[List[str]] = Query(None),
+    excludeIngredients: Optional[List[str]] = Query(None),
 ):
     result = list_recipes(
         q=q,
@@ -75,8 +77,22 @@ def api_list_recipes(
         categories=categories,
         randomize=randomize,
         seed=seed,
+        include_ingredients=includeIngredients,
+        exclude_ingredients=excludeIngredients,
     )
     return result
+
+
+@app.get("/api/ingredients")
+def api_list_ingredients():
+    """Return all ingredients stored in the database, sorted alphabetically."""
+    from app.data_loader import DB_PATH
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM ingredients ORDER BY name COLLATE NOCASE;")
+    items = [{"id": row[0], "name": row[1]} for row in cur.fetchall()]
+    conn.close()
+    return items
 
 
 # --- Single recipe ---
@@ -92,7 +108,7 @@ def api_get_recipe(rid: str):
 @app.get("/api/languages")
 def api_list_languages():
     """Return list of all available languages."""
-    from app.recipes_loader import DB_PATH
+    from app.data_loader import DB_PATH
 
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -106,7 +122,7 @@ def api_list_languages():
 @app.get("/api/categories")
 def api_list_categories():
     """Return list of all distinct categories."""
-    from app.recipes_loader import DB_PATH
+    from app.data_loader import DB_PATH
 
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()

@@ -1,4 +1,5 @@
 import { Range } from 'react-range'
+import Select from 'react-select';
 import React, { useEffect, useState } from 'react'
 import './RecipeList.css'
 
@@ -33,6 +34,9 @@ export default function RecipeList() {
   const [ratingRange, setRatingRange] = useState([1, 5])
   const [numRatingsRange, setNumRatingsRange] = useState([0, 30000])
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9))
+  const [allIngredients, setAllIngredients] = useState([]);
+  const [includeIngredients, setIncludeIngredients] = useState([]);
+  const [excludeIngredients, setExcludeIngredients] = useState([]);
   const [firstLoad, setFirstLoad] = useState(true)
   const [language, setLanguage] = useState('')
   const [categories, setCategories] = useState([])
@@ -61,6 +65,20 @@ export default function RecipeList() {
     loadCategories()
   }, [])
 
+  useEffect(() => {
+    async function loadIngredients() {
+      try {
+        const res = await fetch(`${API}/api/ingredients`);
+        if (!res.ok) throw new Error('Failed to load ingredients');
+        const data = await res.json();
+        setAllIngredients(data);
+      } catch (e) {
+        console.error('Failed to load ingredients:', e);
+        setAllIngredients([]); // fallback
+      }
+    }
+    loadIngredients();
+  }, []);
 
   useEffect(() => {
     if (firstLoad) return
@@ -100,45 +118,60 @@ export default function RecipeList() {
   }
 
   async function fetchList(first = false) {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
-    const params = new URLSearchParams()
-    if (q) params.set('q', q)
-    params.set('page', page)
-    params.set('per_page', perPage)
-    if (sort) params.set('sort', sort)
-    if (desc) params.set('desc', 'true')
-    if (first) params.set('first_load', 'true')
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    params.set("page", page);
+    params.set("per_page", perPage);
+    if (sort) params.set("sort", sort);
+    if (desc) params.set("desc", "true");
+    if (first) params.set("first_load", "true");
 
-    params.set('rating_min', ratingRange[0])
-    params.set('rating_max', ratingRange[1])
-    params.set('num_ratings_min', numRatingsRange[0])
-    params.set('num_ratings_max', numRatingsRange[1])
-    params.set('seed', seed)
+    params.set("rating_min", ratingRange[0]);
+    params.set("rating_max", ratingRange[1]);
+    params.set("num_ratings_min", numRatingsRange[0]);
+    params.set("num_ratings_max", numRatingsRange[1]);
+    params.set("seed", seed);
+
     const enabledLanguages = Object.entries(languageFilter)
       .filter(([_, enabled]) => enabled)
-      .map(([lang]) => lang)
+      .map(([lang]) => lang);
 
     if (enabledLanguages.length === 1) {
-      params.set('language', enabledLanguages[0])
+      params.set("language", enabledLanguages[0]);
     } else {
-      params.delete('language') // send nothing to include both
+      params.delete("language"); // send nothing to include all
     }
 
-    if (categories.length > 0) categories.forEach(cat => params.append('categories', cat))
+    // --- Categories ---
+    if (categories.length > 0)
+      categories.forEach((cat) => params.append("categories", cat));
+
+    // --- ✅ Include Ingredients ---
+    if (includeIngredients.length > 0)
+      includeIngredients.forEach((id) =>
+        params.append("includeIngredients", id)
+      );
+
+    // --- ✅ Exclude Ingredients ---
+    if (excludeIngredients.length > 0)
+      excludeIngredients.forEach((id) =>
+        params.append("excludeIngredients", id)
+      );
 
     try {
-      if (first || (!sort && !desc)) params.set('randomize', 'true')
-      const res = await fetch(`${API}/api/recipes?${params.toString()}`)
-      const data = await res.json()
-      setItems(data.items)
-      setTotal(data.total)
+      if (first || (!sort && !desc)) params.set("randomize", "true");
+      const res = await fetch(`${API}/api/recipes?${params.toString()}`);
+      const data = await res.json();
+      setItems(data.items);
+      setTotal(data.total);
     } catch (e) {
-      console.error(e)
-      setError('Failed to load recipes.')
+      console.error(e);
+      setError("Failed to load recipes.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -329,6 +362,35 @@ export default function RecipeList() {
           </div>
         </div>
 
+        <div className="filters">
+          <div className="filter" style={{ minWidth: '250px' }}>
+            <label>Include ingredients:</label>
+            <Select
+              isMulti
+              options={allIngredients.map(i => ({ value: i.id, label: i.name }))}
+              value={allIngredients
+                .filter(i => includeIngredients.includes(i.id))
+                .map(i => ({ value: i.id, label: i.name }))}
+              onChange={selected => setIncludeIngredients(selected.map(s => s.value))}
+              placeholder="Search ingredients to include..."
+              classNamePrefix="react-select"
+            />
+          </div>
+
+          <div className="filter" style={{ minWidth: '250px' }}>
+            <label>Exclude ingredients:</label>
+            <Select
+              isMulti
+              options={allIngredients.map(i => ({ value: i.id, label: i.name }))}
+              value={allIngredients
+                .filter(i => excludeIngredients.includes(i.id))
+                .map(i => ({ value: i.id, label: i.name }))}
+              onChange={selected => setExcludeIngredients(selected.map(s => s.value))}
+              placeholder="Search ingredients to exclude..."
+              classNamePrefix="react-select"
+            />
+          </div>
+        </div>
       </div>
 
       {loading ? <div>Loading...</div> : error ? <div className="error">{error}</div> : (
@@ -373,60 +435,63 @@ export default function RecipeList() {
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <button className="close-btn" onClick={() => setSelectedRecipe(null)}>Close</button>
 
-            <img
-              className="recipe-large-img"
-              src={`${API}/images/recipes/large/${selectedRecipe.id}.jpeg`}
-              alt={selectedRecipe.title}
-            />
+            <div className="modal-top">
+              <img
+                className="recipe-large-img"
+                src={`${API}/images/recipes/large/${selectedRecipe.id}.jpeg`}
+                alt={selectedRecipe.title}
+              />
+              <div className="recipe-details-right">
+                <h2>{selectedRecipe.title}</h2>
+                <div className="meta-top">
+                  <p><strong>Rating:</strong> {selectedRecipe.rating}</p>
+                  <p><strong>NumRatings:</strong> {selectedRecipe.numberOfRatings}</p>
+                  <p><strong>Prep Time:</strong> {selectedRecipe.preparationTime}</p>
+                  <p><strong>Total Time:</strong> {selectedRecipe.totalTime}</p>
+                  <p><strong>Portions:</strong> {selectedRecipe.numberOfPortions}</p>
+                  <p className="difficulty-level">
+                    <strong>Difficulty:</strong> {renderDifficultyDots(selectedRecipe.difficultyLevel ?? 1)}
+                  </p>
 
-            <h2>{selectedRecipe.title}</h2>
-            <p><strong>Rating:</strong> {selectedRecipe.rating}</p>
-            <p><strong>NumRatings:</strong> {selectedRecipe.numberOfRatings}</p>
-            <p><strong>Prep Time:</strong> {selectedRecipe.preparationTime}</p>
-            <p><strong>Total Time:</strong> {selectedRecipe.totalTime}</p>
-            <p><strong>Portions:</strong> {selectedRecipe.numberOfPortions}</p>
+                </div>
+              </div>
+            </div>
 
             {selectedRecipe.data?.ingredients?.length > 0 && (
-              <div>
+              <div className="ingredients-section">
                 <h3>Ingredients:</h3>
                 <ul className="ingredients-list">
                   {selectedRecipe.data.ingredients.map((name, idx) => {
                     const id = selectedRecipe.data.ingredientIds?.[idx];
                     const imgUrl = id ? `${API}/images/ingredients/${id}.png` : null;
-
                     return (
                       <li key={idx} className="ingredient-item">
-                        {imgUrl && (
-                          <img
-                            src={imgUrl}
-                            alt={name}
-                            onError={(e) => (e.target.style.display = 'none')}
-                          />
-                        )}
+                        {imgUrl && <img src={imgUrl} alt={name} onError={e => (e.target.style.display = 'none')} />}
                         <span>{name}</span>
                       </li>
-                    );
+                    )
                   })}
                 </ul>
               </div>
             )}
 
             {selectedRecipe.data?.recipe?.length > 0 && (
-              <div>
+              <div className="steps-section">
                 <h3>Steps:</h3>
-                <ol>{selectedRecipe.data.recipe.map((s, idx) => <li key={idx}>{s}</li>)}</ol>
+                <ol className="steps-list">
+                  {selectedRecipe.data.recipe.map((s, idx) => <li key={idx}>{s}</li>)}
+                </ol>
               </div>
             )}
 
             {selectedRecipe.data?.nutrition && (
-              <div>
+              <div className="nutrition-section">
                 <h3>Nutrition (per serving):</h3>
                 <ul>
                   {Object.entries(selectedRecipe.data.nutrition.values).map(([k, v]) => <li key={k}>{k}: {v}</li>)}
                 </ul>
               </div>
             )}
-
           </div>
         </div>
       )}
