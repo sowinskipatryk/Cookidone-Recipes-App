@@ -84,7 +84,7 @@ export default function RecipeList() {
     if (firstLoad) return
     const delay = setTimeout(() => fetchList(false), 500)
     return () => clearTimeout(delay)
-  }, [q, ratingRange, numRatingsRange, language, categories, languageFilter])
+  }, [q, ratingRange, numRatingsRange, language, categories, languageFilter, includeIngredients, excludeIngredients])
 
   useEffect(() => {
     function handleClickOutside(e) {

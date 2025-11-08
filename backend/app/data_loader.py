@@ -343,38 +343,15 @@ def list_recipes(
 
     # Include ingredients
     if include_ingredients:
-        joins.append("""
-            JOIN recipe_ingredients ri_inc ON ri_inc.recipe_id = r.id
-            JOIN ingredients i_inc ON i_inc.id = ri_inc.ingredient_id
-        """)
-        # Must include all ingredients: use COUNT in a subquery
-        where.append(f"""
-            r.id IN (
-                SELECT ri.recipe_id
-                FROM recipe_ingredients ri
-                JOIN ingredients i ON i.id = ri.ingredient_id
-                WHERE i.name IN ({','.join(['?'] * len(include_ingredients))})
-                GROUP BY ri.recipe_id
-                HAVING COUNT(DISTINCT i.name) = ?
-            )
-        """)
-        params.extend(include_ingredients + [len(include_ingredients)])
+        for ing in include_ingredients:
+            where.append("r.rowid IN (SELECT rowid FROM recipes_fts WHERE recipes_fts MATCH ?)")
+            params.append(ing)
 
     # Exclude ingredients
     if exclude_ingredients:
-        joins.append("""
-            LEFT JOIN recipe_ingredients ri_exc ON ri_exc.recipe_id = r.id
-            LEFT JOIN ingredients i_exc ON i_exc.id = ri_exc.ingredient_id
-        """)
-        where.append(f"""
-            r.id NOT IN (
-                SELECT ri.recipe_id
-                FROM recipe_ingredients ri
-                JOIN ingredients i ON i.id = ri.ingredient_id
-                WHERE i.name IN ({','.join(['?'] * len(exclude_ingredients))})
-            )
-        """)
-        params.extend(exclude_ingredients)
+        for ing in exclude_ingredients:
+            where.append("r.rowid NOT IN (SELECT rowid FROM recipes_fts WHERE recipes_fts MATCH ?)")
+            params.append(ing)
 
     if language:
         where.append("r.language = ?")
