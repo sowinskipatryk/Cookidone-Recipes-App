@@ -48,13 +48,12 @@ def parse_sort_key(item, key: str):
 @app.get("/api/recipes")
 def api_list_recipes(
     q: Optional[str] = Query(None),
-    sort: Optional[str] = Query(None),
+    sort: Optional[str] = Query("rating"),
     desc: bool = Query(False),
     page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=200),
+    per_page: int = Query(30, ge=1, le=200),
     seed: Optional[int] = Query(None),
-    randomize: bool = Query(False),      # optional
-    first_load: bool = Query(False),     # new
+    randomize: bool = Query(False),
     rating_min: float = Query(0.0),
     rating_max: float = Query(5.0),
     num_ratings_min: int = Query(0),
@@ -62,34 +61,22 @@ def api_list_recipes(
     language: Optional[str] = Query(None),
     categories: Optional[list[str]] = Query(None),
 ):
-    """List recipes with optional search, filters, sorting, pagination, and first-load shuffle."""
     result = list_recipes(
+        q=q,
         page=page,
         per_page=per_page,
-        randomize=randomize or first_load,
+        sort=sort,
+        desc=desc,
         rating_min=rating_min,
         rating_max=rating_max,
         num_ratings_min=num_ratings_min,
         num_ratings_max=num_ratings_max,
         language=language,
         categories=categories,
+        randomize=randomize,
         seed=seed,
     )
-
-    items = result["items"]
-    total = result["total"]
-
-    # Sorting
-    if sort:
-        items = sorted(items, key=lambda it: parse_sort_key(it, sort), reverse=desc)
-
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "items": items,
-    }
-
+    return result
 
 
 # --- Single recipe ---

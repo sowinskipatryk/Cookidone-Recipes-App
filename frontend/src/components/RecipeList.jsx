@@ -23,15 +23,15 @@ export default function RecipeList() {
   const [q, setQ] = useState('')
   const [items, setItems] = useState([])
   const [page, setPage] = useState(1)
-  const [perPage] = useState(20)
+  const [perPage] = useState(30)
   const [total, setTotal] = useState(0)
   const [sort, setSort] = useState('')
   const [desc, setDesc] = useState(false)
   const [loading, setLoading] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [error, setError] = useState(null)
-  const [ratingRange, setRatingRange] = useState([0, 5])
-  const [numRatingsRange, setNumRatingsRange] = useState([0, 5000])
+  const [ratingRange, setRatingRange] = useState([1, 5])
+  const [numRatingsRange, setNumRatingsRange] = useState([0, 30000])
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9))
   const [firstLoad, setFirstLoad] = useState(true)
   const [language, setLanguage] = useState('')
@@ -130,7 +130,7 @@ export default function RecipeList() {
 
     try {
       if (first || (!sort && !desc)) params.set('randomize', 'true')
-        const res = await fetch(`${API}/api/recipes?${params.toString()}`)
+      const res = await fetch(`${API}/api/recipes?${params.toString()}`)
       const data = await res.json()
       setItems(data.items)
       setTotal(data.total)
@@ -158,6 +158,33 @@ export default function RecipeList() {
     }
   }
 
+  function formatTime(minutes) {
+    if (!minutes || minutes <= 0) return '—'
+    const h = Math.floor(minutes / 60)
+    const m = minutes % 60
+    if (h > 0 && m > 0) return `${h} h ${m} min`
+    if (h > 0) return `${h} h`
+    return `${m} min`
+  }
+
+  function renderDifficultyDots(level) {
+    const colors = ['#4CAF50', '#FFC107', '#F44336'] // green, yellow, red
+    const maxDots = 1
+    return Array.from({ length: maxDots }, (_, i) => (
+      <span
+        key={i}
+        style={{
+          display: 'inline-block',
+          width: '10px',
+          height: '10px',
+          borderRadius: '50%',
+          marginRight: '3px',
+          backgroundColor: i < level ? colors[level - 1] : '#ccc',
+        }}
+      />
+    ))
+  }
+
   return (
     <div className="recipe-list-container">
       <form className="search-form">
@@ -174,111 +201,111 @@ export default function RecipeList() {
       </div>
 
       <div className="filters">
-<div className="filter">
-  <label>Rating: </label>
-  <Range
-    step={0.1}
-    min={0}
-    max={5}
-    values={ratingRange}
-    onChange={setRatingRange}
-    renderTrack={({ props, children }) => (
-      <div
-        {...props}
-        style={{
-          ...props.style,
-          height: '6px',
-          width: '100%',
-          background: 'linear-gradient(to right, #ddd, #007bff)',
-          borderRadius: '3px',
-        }}
-      >
-        {children}
-      </div>
-    )}
-renderThumb={({ props, index }) => (
-  <div
-    {...props}
-    style={{
-      ...props.style, // keep the calculated top/left
-      height: '16px',
-      width: '16px',
-      borderRadius: '50%',
-      backgroundColor: '#007bff',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      // optional: add a border or box-shadow
-    }}
-  >
-    <div
-      style={{
-        position: 'absolute',
-        top: '-24px', // move the label above thumb
-        color: '#000',
-        fontSize: '12px',
-      }}
-    >
-      {ratingRange[index].toFixed(1)}
-    </div>
-  </div>
-)}
+        <div className="filter">
+          <label>Rating: </label>
+          <Range
+            step={0.1}
+            min={1}
+            max={5}
+            values={ratingRange}
+            onChange={setRatingRange}
+            renderTrack={({ props, children }) => (
+              <div
+                {...props}
+                style={{
+                  ...props.style,
+                  height: '6px',
+                  width: '100%',
+                  background: 'linear-gradient(to right, #ddd, #007bff)',
+                  borderRadius: '3px',
+                }}
+              >
+                {children}
+              </div>
+            )}
+            renderThumb={({ props, index }) => (
+              <div
+                {...props}
+                style={{
+                  ...props.style, // keep the calculated top/left
+                  height: '16px',
+                  width: '16px',
+                  borderRadius: '50%',
+                  backgroundColor: '#007bff',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  // optional: add a border or box-shadow
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '-24px', // move the label above thumb
+                    color: '#000',
+                    fontSize: '12px',
+                  }}
+                >
+                  {ratingRange[index].toFixed(1)}
+                </div>
+              </div>
+            )}
 
-  />
-</div>
-
-<div className="filter">
-  <label>
-    NumRatings:
-  </label>
-  <Range
-    step={1}
-    min={0}
-    max={5000}
-    values={numRatingsRange}
-    onChange={setNumRatingsRange}
-    renderTrack={({ props, children }) => (
-      <div
-        {...props}
-        style={{
-          ...props.style,
-          height: '6px',
-          width: '100%',
-          background: 'linear-gradient(to right, #ddd, #007bff)',
-          borderRadius: '3px',
-        }}
-      >
-        {children}
-      </div>
-    )}
-    renderThumb={({ props, index }) => (
-      <div
-        {...props}
-        style={{
-          ...props.style, // keep library-calculated top/left
-          height: '16px',
-          width: '16px',
-          borderRadius: '50%',
-          backgroundColor: '#007bff',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: '-24px', // move label above thumb
-            color: '#000',
-            fontSize: '12px',
-          }}
-        >
-          {numRatingsRange[index]}
+          />
         </div>
-      </div>
-    )}
-  />
-</div>
+
+        <div className="filter">
+          <label>
+            NumRatings:
+          </label>
+          <Range
+            step={1}
+            min={0}
+            max={30000}
+            values={numRatingsRange}
+            onChange={setNumRatingsRange}
+            renderTrack={({ props, children }) => (
+              <div
+                {...props}
+                style={{
+                  ...props.style,
+                  height: '6px',
+                  width: '100%',
+                  background: 'linear-gradient(to right, #ddd, #007bff)',
+                  borderRadius: '3px',
+                }}
+              >
+                {children}
+              </div>
+            )}
+            renderThumb={({ props, index }) => (
+              <div
+                {...props}
+                style={{
+                  ...props.style, // keep library-calculated top/left
+                  height: '16px',
+                  width: '16px',
+                  borderRadius: '50%',
+                  backgroundColor: '#007bff',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '-24px', // move label above thumb
+                    color: '#000',
+                    fontSize: '12px',
+                  }}
+                >
+                  {numRatingsRange[index]}
+                </div>
+              </div>
+            )}
+          />
+        </div>
 
         <div className="filter">
           <label>Language:</label>
@@ -338,36 +365,32 @@ renderThumb={({ props, index }) => (
 
       {loading ? <div>Loading...</div> : error ? <div className="error">{error}</div> : (
         <>
-          <table className="recipes-table">
-            <thead>
-              <tr>
-                <th>Image</th>
-                <th>Title</th>
-                <th>Rating</th>
-                <th>NumRatings</th>
-                <th>Prep Time</th>
-                <th>Total Time</th>
-                <th>Difficulty</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(it => (
-                <tr key={it.id} onClick={() => openRecipe(it.id)} style={{ cursor: 'pointer' }}>
-                  <td><img src={`${API}/images/recipes/small/${it.id}.jpeg`} alt="" /></td>
-                  <td>{it.title}</td>
-                  <td>{it.rating}</td>
-                  <td>{it.numberOfRatings}</td>
-                  <td>{it.preparationTime}</td>
-                  <td>{it.totalTime}</td>
-                  <td>
-                    {it.difficultyLevel === 1 && '●○○'}
-                    {it.difficultyLevel === 2 && '●●○'}
-                    {it.difficultyLevel === 3 && '●●●'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="recipes-grid">
+            {items.map(it => (
+              <div key={it.id} className="recipe-card" onClick={() => openRecipe(it.id)}>
+                <img
+                  src={`${API}/images/recipes/small/${it.id}.jpeg`}
+                  alt={it.title}
+                  className="recipe-image"
+                />
+                <div className="recipe-info">
+                  <h3 className="recipe-title">{it.title}</h3>
+                  <div className="recipe-meta">
+                    <div className="rating-info">
+                      <span className="rating">⭐ {it.rating?.toFixed(1) ?? '–'}</span>
+                      <span className="num-ratings">({it.numberOfRatings ?? 0})</span>
+                    </div>
+                    <span className="total-time">
+                      ⏱ {formatTime(it.totalTime)}
+                    </span>
+                    {/* <span className="difficulty-dots">
+                      {renderDifficultyDots(it.difficultyLevel)}
+                    </span> */}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
 
           <div className="pagination">
             <button onClick={() => setPage(p => Math.max(p - 1, 1))} disabled={page === 1}>Previous</button>
@@ -413,7 +436,7 @@ renderThumb={({ props, index }) => (
               <div>
                 <h3>Nutrition (per serving):</h3>
                 <ul>
-                  {Object.entries(selectedRecipe.data.nutrition.values).map(([k,v]) => <li key={k}>{k}: {v}</li>)}
+                  {Object.entries(selectedRecipe.data.nutrition.values).map(([k, v]) => <li key={k}>{k}: {v}</li>)}
                 </ul>
               </div>
             )}

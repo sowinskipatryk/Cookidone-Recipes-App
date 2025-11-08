@@ -173,3 +173,134 @@
 .dropdown-item:hover {
   background-color: #f0f0f0;
 }
+
+/* --- Recipe Grid Layout --- */
+.recipes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  padding: 10px 0;
+}
+
+/* --- Individual Recipe Card --- */
+.recipe-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.recipe-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.15);
+}
+
+/* --- Recipe Image --- */
+.recipe-image {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+}
+
+/* --- Recipe Text Content --- */
+.recipe-info {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-grow: 1;
+}
+
+.recipe-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.recipe-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: #666;
+}
+
+.rating {
+  color: #f39c12;
+  font-weight: 600;
+}
+
+.num-ratings {
+  font-size: 13px;
+  color: #888;
+}
+
+/* --- Dark Mode Friendly (optional) --- */
+@media (prefers-color-scheme: dark) {
+  .recipe-card {
+    background: #1e1e1e;
+    color: #ddd;
+  }
+  .recipe-title { color: #fff; }
+}
+
+.recipe-meta {
+  display: flex;
+  justify-content: space-between; /* rating left, time right */
+  align-items: center;
+  font-size: 14px;
+  color: #666;
+  margin-top: auto;
+}
+
+.rating-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rating {
+  color: #f39c12;
+  font-weight: 600;
+}
+
+.num-ratings {
+  font-size: 13px;
+  color: #888;
+}
+
+.total-time {
+  font-size: 14px;
+  color: #555;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.recipe-meta-inline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #555;
+  margin-top: 6px;
+}
+
+.recipe-meta-inline span {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.difficulty-dots {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}

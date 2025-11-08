@@ -260,67 +260,101 @@ def import_json_to_db():
 
 # --- Query helpers ---
 def list_recipes(
+    q: str = None,
     page: int = 1,
     per_page: int = 20,
-    randomize: bool = False,
+    sort: str = "rating",
+    desc: bool = True,
     rating_min: float = 0.0,
     rating_max: float = 5.0,
     num_ratings_min: int = 0,
     num_ratings_max: int = 100000,
     language: str = None,
     categories: List[str] = None,
+    randomize: bool = False,
     seed: int = None,
 ) -> dict:
-    """Paginated and filtered list of recipes from DB."""
+    """Paginated, filtered, optionally searched and sorted list of recipes."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    offset = (page - 1) * per_page
-    order_clause = "ORDER BY r.rating DESC"  # default deterministic order
+    # --- Build base query ---
+    params = []
+    joins = []
+    where = ["1=1"]
 
-    where = [
-        "r.rating BETWEEN ? AND ?",
-        "r.numberOfRatings BETWEEN ? AND ?"
-    ]
-    params = [rating_min, rating_max, num_ratings_min, num_ratings_max]
+    # --- Filters ---
+    where.append("r.rating BETWEEN ? AND ?")
+    params.extend([rating_min, rating_max])
+
+    where.append("r.numberOfRatings BETWEEN ? AND ?")
+    params.extend([num_ratings_min, num_ratings_max])
 
     if language:
         where.append("r.language = ?")
         params.append(language)
 
-    join_clause = ""
     if categories:
-        join_clause = """
+        joins.append("""
             JOIN recipe_categories rc ON rc.recipe_id = r.id
             JOIN categories c ON c.id = rc.category_id
-        """
+        """)
         where.append(f"c.name IN ({','.join(['?'] * len(categories))})")
         params.extend(categories)
 
-    where_clause = "WHERE " + " AND ".join(where)
+    # --- Full-text search ---
+    if q:
+        joins.append("JOIN recipes_fts fts ON r.rowid = fts.rowid")
+        where.append("fts MATCH ?")
+        # partial search: add * if not present
+        if not q.endswith('*'):
+            q = q + '*'
+        params.append(q)
 
+    # --- Sorting ---
+    valid_sort_keys = {
+        "rating": "r.rating",
+        "numberOfRatings": "r.numberOfRatings",
+        "preparationTime": "r.preparationTime",
+        "totalTime": "r.totalTime",
+        "difficultyLevel": "r.difficultyLevel",
+        "title": "r.title"
+    }
+    order_by = valid_sort_keys.get(sort, "r.rating")
+    order_clause = f"ORDER BY {order_by} {'DESC' if desc else 'ASC'}"
+
+    # --- Randomization ---
+    if randomize:
+        if seed is not None:
+            random.seed(seed)
+        order_clause = "ORDER BY RANDOM()"
+
+    # --- Pagination ---
+    offset = (page - 1) * per_page
+
+    # --- Query ---
+    base_query = f"""
+        FROM recipes r
+        {' '.join(joins)}
+        WHERE {' AND '.join(where)}
+    """
+
+    # --- Total count ---
+    cur.execute(f"SELECT COUNT(DISTINCT r.id) {base_query}", params)
+    total = cur.fetchone()[0]
+
+    # --- Fetch paginated results ---
     cur.execute(f"""
         SELECT DISTINCT r.id, r.title, r.rating, r.numberOfRatings,
                         r.preparationTime, r.totalTime, r.difficultyLevel,
                         r.language
-        FROM recipes r
-        {join_clause}
-        {where_clause}
+        {base_query}
         {order_clause}
-    """, params)
-    all_items = [dict(row) for row in cur.fetchall()]
-    total = len(all_items)
+        LIMIT ? OFFSET ?
+    """, params + [per_page, offset])
 
-    # Randomize *after* filtering, if requested
-    if randomize:
-        rnd = random.Random(seed or 777)
-        rnd.shuffle(all_items)
-
-    # Apply pagination manually
-    start = (page - 1) * per_page
-    end = start + per_page
-    items = all_items[start:end]
+    items = [dict(row) for row in cur.fetchall()]
 
     conn.close()
     return {"items": items, "total": total}
@@ -355,15 +389,20 @@ def get_recipe(rid: str) -> Dict:
     return result
 
 
-def search_recipes(q: str, language: str = None, categories: List[str] = None) -> List[Dict]:
-    """Full-text search using FTS5 on title and ingredients."""
+def search_recipes(
+    q: str,
+    language: str = None,
+    categories: List[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+) -> dict:
+    """Full-text search using FTS5 on title and ingredients, with pagination."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
     where = ["fts MATCH ?"]
     params = [q]
-
     join_clause = "JOIN recipes_fts fts ON r.rowid = fts.rowid"
 
     if language:
@@ -378,19 +417,30 @@ def search_recipes(q: str, language: str = None, categories: List[str] = None) -
         params.extend(categories)
 
     where_clause = "WHERE " + " AND ".join(where)
+    offset = (page - 1) * per_page
 
+    # Main query with pagination
     cur.execute(f"""
         SELECT DISTINCT r.*
         FROM recipes r
         {join_clause}
         {where_clause}
         ORDER BY r.rating DESC
-        LIMIT 100
-    """, params)
+        LIMIT ? OFFSET ?
+    """, params + [per_page, offset])
+    items = [dict(row) for row in cur.fetchall()]
 
-    data = [dict(row) for row in cur.fetchall()]
+    # Count total results
+    cur.execute(f"""
+        SELECT COUNT(DISTINCT r.id)
+        FROM recipes r
+        {join_clause}
+        {where_clause}
+    """, params)
+    total = cur.fetchone()[0]
+
     conn.close()
-    return data
+    return {"items": items, "total": total}
 
 
 # --- Run import automatically if DB doesn't exist ---

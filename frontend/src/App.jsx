@@ -5,7 +5,7 @@ import RecipeList from './components/RecipeList'
 export default function App(){
     return (
     <div className="container">
-        <h1>Recipes</h1>
+        <h1>Cookidone</h1>
         <RecipeList />
     </div>
     )
