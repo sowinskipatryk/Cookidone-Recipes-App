@@ -391,7 +391,7 @@
   transition: all var(--transition-base);
   display: flex;
   flex-direction: column;
-  opacity: 0;
+  opacity: 1;
   animation: slideUp var(--transition-slow) ease-out forwards;
 }
 
@@ -407,13 +407,16 @@
 .recipe-image-wrapper {
   position: relative;
   overflow: hidden;
+  width: 100%;
   aspect-ratio: 16/11;
+  background: var(--color-border-light);
 }
 
 .recipe-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
   transition: transform var(--transition-slow);
 }
 
@@ -771,6 +774,7 @@
 
 .stat-value {
   font-size: 1.1rem;
+  height: 2.5rem;
   font-weight: 700;
   color: var(--color-text);
 }
@@ -887,7 +891,7 @@
 /* Nutrition Grid */
 .nutrition-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
 }
 
@@ -915,6 +919,9 @@
 .difficulty-dots {
   display: flex;
   gap: 4px;
+  height: 32px;
+  justify-content: center;
+  align-items: center;
 }
 
 .difficulty-dot {
