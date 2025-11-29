@@ -378,9 +378,9 @@ def list_recipes(
                 SELECT ri.recipe_id
                 FROM recipe_ingredients ri
                 JOIN ingredients i ON i.id = ri.ingredient_id
-                WHERE i.name IN ({','.join(['?'] * len(include_ingredients))})
+                WHERE i.id IN ({','.join(['?'] * len(include_ingredients))})
                 GROUP BY ri.recipe_id
-                HAVING COUNT(DISTINCT i.name) = ?
+                HAVING COUNT(DISTINCT i.id) = ?
             )
         """)
         params.extend(include_ingredients + [len(include_ingredients)])
@@ -396,7 +396,7 @@ def list_recipes(
                 SELECT ri.recipe_id
                 FROM recipe_ingredients ri
                 JOIN ingredients i ON i.id = ri.ingredient_id
-                WHERE i.name IN ({','.join(['?'] * len(exclude_ingredients))})
+                WHERE i.id IN ({','.join(['?'] * len(exclude_ingredients))})
             )
         """)
         params.extend(exclude_ingredients)
