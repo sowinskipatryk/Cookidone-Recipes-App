@@ -246,7 +246,6 @@
   border: 3px solid white;
   box-shadow: var(--shadow-md);
   cursor: grab;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .range-thumb:hover {
