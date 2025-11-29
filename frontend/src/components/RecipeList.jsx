@@ -31,6 +31,28 @@ function formatTime(minutes) {
   return `${m}min`
 }
 
+// Non-linear popularity steps: 0, 10-100 by 10, 200-1000 by 100, 2000-10000 by 1000, 20000-30000 by 10000
+const POPULARITY_STEPS = [
+  0,
+  10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
+  200, 300, 400, 500, 600, 700, 800, 900, 1000,
+  2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000,
+  20000, 30000
+]
+
+// Convert slider index to actual value
+function indexToPopularity(index) {
+  return POPULARITY_STEPS[Math.min(index, POPULARITY_STEPS.length - 1)]
+}
+
+// Format popularity for display
+function formatPopularity(value) {
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`
+  }
+  return value.toString()
+}
+
 // Loading skeleton component
 function SkeletonCard() {
   return (
@@ -67,7 +89,7 @@ export default function RecipeList() {
   const [q, setQ] = useState('')
   const [items, setItems] = useState([])
   const [page, setPage] = useState(1)
-  const [perPage] = useState(30)
+  const [perPage] = useState(36)
   const [total, setTotal] = useState(0)
   const [sort, setSort] = useState('')
   const [desc, setDesc] = useState(false)
@@ -75,7 +97,7 @@ export default function RecipeList() {
   const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [error, setError] = useState(null)
   const [ratingRange, setRatingRange] = useState([1, 5])
-  const [numRatingsRange, setNumRatingsRange] = useState([0, 30000])
+  const [numRatingsRangeIdx, setNumRatingsRangeIdx] = useState([0, POPULARITY_STEPS.length - 1])
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9))
   const [allIngredients, setAllIngredients] = useState([])
   const [includeIngredients, setIncludeIngredients] = useState([])
@@ -111,8 +133,8 @@ export default function RecipeList() {
 
     params.set('rating_min', ratingRange[0])
     params.set('rating_max', ratingRange[1])
-    params.set('num_ratings_min', numRatingsRange[0])
-    params.set('num_ratings_max', numRatingsRange[1])
+    params.set('num_ratings_min', indexToPopularity(numRatingsRangeIdx[0]))
+    params.set('num_ratings_max', indexToPopularity(numRatingsRangeIdx[1]))
     params.set('seed', seed)
 
     const enabledLanguages = Object.entries(languageFilter)
@@ -148,7 +170,7 @@ export default function RecipeList() {
     } finally {
       setLoading(false)
     }
-  }, [q, page, perPage, sort, desc, ratingRange, numRatingsRange, seed, languageFilter, categories, includeIngredients, excludeIngredients])
+  }, [q, page, perPage, sort, desc, ratingRange, numRatingsRangeIdx, seed, languageFilter, categories, includeIngredients, excludeIngredients])
 
   // Initial load + sort/desc changes
   useEffect(() => {
@@ -196,7 +218,7 @@ export default function RecipeList() {
     }
     const delay = setTimeout(() => fetchList(false), 400)
     return () => clearTimeout(delay)
-  }, [q, ratingRange, numRatingsRange, categories, languageFilter, includeIngredients, excludeIngredients])
+  }, [q, ratingRange, numRatingsRangeIdx, categories, languageFilter, includeIngredients, excludeIngredients])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -207,13 +229,13 @@ export default function RecipeList() {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
-  // Sort handler
+  // Sort handler - first click descending, second click ascending
   function changeSort(field) {
     if (sort === field) {
       setDesc(!desc)
     } else {
       setSort(field)
-      setDesc(false)
+      setDesc(true) // Start with descending order
     }
     // Reset seed for new sort
     setSeed(Math.floor(Math.random() * 1e9))
@@ -376,11 +398,11 @@ export default function RecipeList() {
                 <label>Popularity</label>
                 <div className="range-wrapper">
                   <Range
-                    step={100}
+                    step={1}
                     min={0}
-                    max={30000}
-                    values={numRatingsRange}
-                    onChange={setNumRatingsRange}
+                    max={POPULARITY_STEPS.length - 1}
+                    values={numRatingsRangeIdx}
+                    onChange={setNumRatingsRangeIdx}
                     renderTrack={({ props, children }) => (
                       <div
                         {...props}
@@ -388,10 +410,10 @@ export default function RecipeList() {
                         style={{
                           ...props.style,
                           background: getTrackBackground({
-                            values: numRatingsRange,
+                            values: numRatingsRangeIdx,
                             colors: ['var(--color-border)', 'var(--color-primary)', 'var(--color-border)'],
                             min: 0,
-                            max: 30000,
+                            max: POPULARITY_STEPS.length - 1,
                           }),
                         }}
                       >
@@ -403,8 +425,8 @@ export default function RecipeList() {
                     )}
                   />
                   <div className="range-values">
-                    <span>{numRatingsRange[0].toLocaleString()}</span>
-                    <span>{numRatingsRange[1].toLocaleString()}</span>
+                    <span>{formatPopularity(indexToPopularity(numRatingsRangeIdx[0]))}</span>
+                    <span>{formatPopularity(indexToPopularity(numRatingsRangeIdx[1]))}</span>
                   </div>
                 </div>
               </div>

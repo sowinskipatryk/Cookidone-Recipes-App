@@ -246,6 +246,11 @@
   border: 3px solid white;
   box-shadow: var(--shadow-md);
   cursor: grab;
+  outline: none;
+}
+
+.range-thumb:focus {
+  outline: none;
 }
 
 .range-thumb:hover {
