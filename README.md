@@ -1,4 +1,4 @@
-# 🍳 Recipes App
+# 🍳 Cookidone - Recipes App
 
 A modern recipe discovery app with powerful filtering and search capabilities. Browse through recipes with smart ingredient grouping.
 
