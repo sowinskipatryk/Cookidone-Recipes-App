@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from typing import Optional, List
 import math
+import json
 
 from app.data_loader import (
     list_recipes,
@@ -14,6 +15,13 @@ from app.data_loader import (
 import sqlite3
 
 app = FastAPI(title="Recipes API")
+
+# --- Load grouped ingredients ---
+INGREDIENTS_GROUPED_FILE = Path(__file__).resolve().parents[2] / "ingredients" / "ingredients_grouped.json"
+INGREDIENTS_GROUPED = {}
+if INGREDIENTS_GROUPED_FILE.exists():
+    with open(INGREDIENTS_GROUPED_FILE, 'r', encoding='utf-8') as f:
+        INGREDIENTS_GROUPED = json.load(f)
 
 # --- CORS ---
 app.add_middleware(
@@ -63,6 +71,11 @@ def api_list_recipes(
     includeIngredients: Optional[List[str]] = Query(None),
     excludeIngredients: Optional[List[str]] = Query(None),
 ):
+    # Expand include ingredients to groups (at least one from each group)
+    # Expand exclude ingredients to flat list (exclude any of these)
+    include_groups = expand_ingredient_ids(includeIngredients) if includeIngredients else None
+    exclude_flat = flatten_ingredient_ids(excludeIngredients) if excludeIngredients else None
+    
     result = list_recipes(
         q=q,
         page=page,
@@ -77,15 +90,28 @@ def api_list_recipes(
         categories=categories,
         randomize=randomize,
         seed=seed,
-        include_ingredients=includeIngredients,
-        exclude_ingredients=excludeIngredients,
+        include_ingredient_groups=include_groups,
+        exclude_ingredients=exclude_flat,
     )
     return result
 
 
 @app.get("/api/ingredients")
-def api_list_ingredients():
-    """Return all ingredients stored in the database, sorted alphabetically."""
+def api_list_ingredients(grouped: bool = Query(True)):
+    """
+    Return ingredients for filtering.
+    If grouped=True (default): returns base ingredient names with their variant IDs
+    If grouped=False: returns all individual ingredients
+    """
+    if grouped and INGREDIENTS_GROUPED.get("baseIngredients"):
+        # Return grouped base ingredients (sorted by count, most common first)
+        return [
+            {"id": item["name"], "name": item["name"].title(), "ids": item["ids"], "count": item["count"]}
+            for item in INGREDIENTS_GROUPED["baseIngredients"]
+            if item["count"] > 0
+        ]
+    
+    # Fallback: return all individual ingredients from database
     from app.data_loader import DB_PATH
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -93,6 +119,52 @@ def api_list_ingredients():
     items = [{"id": row[0], "name": row[1]} for row in cur.fetchall()]
     conn.close()
     return items
+
+
+def expand_ingredient_ids(ingredient_names: List[str]) -> List[List[str]]:
+    """
+    Expand base ingredient names to groups of variant IDs.
+    Returns a list of lists - each inner list contains all IDs for one base ingredient.
+    This allows the query to require "at least one from each group".
+    """
+    if not INGREDIENTS_GROUPED.get("baseToIds"):
+        # Fallback: treat each name as its own group
+        return [[name] for name in ingredient_names]
+    
+    groups = []
+    base_to_ids = INGREDIENTS_GROUPED["baseToIds"]
+    
+    for name in ingredient_names:
+        name_lower = name.lower()
+        if name_lower in base_to_ids:
+            # It's a base ingredient name - get all variant IDs as a group
+            groups.append(base_to_ids[name_lower])
+        else:
+            # It might be an individual ID - treat as single-item group
+            groups.append([name])
+    
+    return groups
+
+
+def flatten_ingredient_ids(ingredient_names: List[str]) -> List[str]:
+    """
+    Flatten base ingredient names to a single list of all variant IDs.
+    Used for exclude logic (exclude ANY of these IDs).
+    """
+    if not INGREDIENTS_GROUPED.get("baseToIds"):
+        return ingredient_names
+    
+    expanded = []
+    base_to_ids = INGREDIENTS_GROUPED["baseToIds"]
+    
+    for name in ingredient_names:
+        name_lower = name.lower()
+        if name_lower in base_to_ids:
+            expanded.extend(base_to_ids[name_lower])
+        else:
+            expanded.append(name)
+    
+    return list(set(expanded))
 
 
 # --- Single recipe ---
@@ -137,6 +209,3 @@ def api_list_categories():
 def health():
     return {"status": "ok"}
 
-
-# --- Optionally serve frontend build ---
-# app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="frontend")

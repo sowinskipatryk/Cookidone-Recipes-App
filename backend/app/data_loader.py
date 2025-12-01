@@ -54,7 +54,7 @@ def init_db():
     );
     """)
 
-    # --- ✅ Ingredients table ---
+    # --- Ingredients table ---
     c.execute("""
     CREATE TABLE IF NOT EXISTS ingredients (
         id TEXT PRIMARY KEY,
@@ -347,7 +347,7 @@ def list_recipes(
     categories: List[str] = None,
     randomize: bool = False,
     seed: int = None,
-    include_ingredients: List[str] = None,
+    include_ingredient_groups: List[List[str]] = None,
     exclude_ingredients: List[str] = None,
 ) -> dict:
     """Paginated, filtered, optionally searched and sorted list of recipes."""
@@ -366,24 +366,19 @@ def list_recipes(
     where.append("r.numberOfRatings BETWEEN ? AND ?")
     params.extend([num_ratings_min, num_ratings_max])
 
-    # Include ingredients
-    if include_ingredients:
-        joins.append("""
-            JOIN recipe_ingredients ri_inc ON ri_inc.recipe_id = r.id
-            JOIN ingredients i_inc ON i_inc.id = ri_inc.ingredient_id
-        """)
-        # Must include all ingredients: use COUNT in a subquery
-        where.append(f"""
-            r.id IN (
-                SELECT ri.recipe_id
-                FROM recipe_ingredients ri
-                JOIN ingredients i ON i.id = ri.ingredient_id
-                WHERE i.id IN ({','.join(['?'] * len(include_ingredients))})
-                GROUP BY ri.recipe_id
-                HAVING COUNT(DISTINCT i.id) = ?
-            )
-        """)
-        params.extend(include_ingredients + [len(include_ingredients)])
+    # Include ingredient groups - require at least one match from EACH group
+    if include_ingredient_groups:
+        for group_idx, group_ids in enumerate(include_ingredient_groups):
+            if group_ids:
+                placeholders = ','.join(['?'] * len(group_ids))
+                where.append(f"""
+                    r.id IN (
+                        SELECT ri.recipe_id
+                        FROM recipe_ingredients ri
+                        WHERE ri.ingredient_id IN ({placeholders})
+                    )
+                """)
+                params.extend(group_ids)
 
     # Exclude ingredients
     if exclude_ingredients:

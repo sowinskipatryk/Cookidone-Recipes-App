@@ -114,7 +114,10 @@ export default function RecipeList() {
 
   // Memoized ingredient options for react-select
   const ingredientOptions = useMemo(
-    () => allIngredients.map((i) => ({ value: i.id, label: i.name })),
+    () => allIngredients.map((i) => ({ 
+      value: i.id, 
+      label: i.name 
+    })),
     [allIngredients]
   )
 
